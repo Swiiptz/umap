@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Fiches de Personnages — Atlas de l'Umbra</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Mono&display=swap');
+
+*{box-sizing:border-box;}
+html,body{margin:0; min-height:100%; background:#050c0a; font-family:'EB Garamond',serif; color:#e9dfc4;}
+body{ padding-top:96px; padding-bottom:60px; }
+
+.topbar{
+  position:fixed; top:0; left:0; right:0; z-index:20;
+  display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  padding:14px 20px; background:linear-gradient(180deg, rgba(5,12,10,0.95), rgba(5,12,10,0.85) 80%, rgba(5,12,10,0));
+}
+.topbar .left{ display:flex; align-items:center; gap:14px; }
+.topbar h1{font-family:'Cinzel',serif; font-size:20px; margin:0; letter-spacing:1px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8);}
+.topbar .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+.btn{
+  font-family:'EB Garamond',serif; font-size:14px; cursor:pointer;
+  background: linear-gradient(180deg,#ddc677,#c9a227); color:#0d1815; border:1px solid #c9a227; border-radius:6px;
+  padding:8px 14px; font-weight:600;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover{ filter:brightness(1.08); box-shadow:0 2px 14px rgba(201,162,39,0.35); transform:translateY(-1px); }
+.btn:active{ transform:translateY(0); filter:brightness(0.96); }
+.btn.ghost{ background:rgba(15,30,25,0.85); color:#e9dfc4; border:1px solid #3a544b; font-weight:400;}
+.btn.ghost:hover{ box-shadow:0 2px 14px rgba(123,191,154,0.18); border-color:#5a7a6b; }
+.btn.ghost.active{ outline:2px solid #c9a227; }
+.btn.small{ padding:6px 10px; font-size:12.5px; }
+.btn.danger{ background:linear-gradient(180deg,#d6704f,#a83a20); border-color:#a83a20; color:#1a0d08; }
+
+.user-badge{
+  display:flex; align-items:center; gap:8px; font-size:12px; color:#b7ad8e;
+  font-family:'Space Mono',monospace; background:rgba(15,30,25,0.85); border:1px solid #3a544b;
+  border-radius:6px; padding:7px 10px;
+}
+.user-badge button{
+  background:none; border:none; color:#ddc677; cursor:pointer; font-family:'EB Garamond',serif;
+  font-size:12px; padding:0; text-decoration:underline;
+}
+.xp-badge-top{
+  display:flex; align-items:center; gap:6px; font-family:'Cinzel',serif; font-size:14px; color:#ddc677;
+  background:rgba(15,30,25,0.85); border:1px solid #c9a227; border-radius:20px; padding:7px 14px;
+}
+.xp-badge-top span{ font-family:'Space Mono',monospace; font-size:14px; }
+
+.privacy-note{
+  max-width:900px; margin:0 auto 18px; padding:10px 16px; text-align:center;
+  font-size:12px; font-family:'Space Mono',monospace; color:#8a9a91;
+  border:1px solid #3a544b; border-radius:8px; background:rgba(15,30,25,0.5);
+}
+
+/* ---- GM roster ---- */
+.roster-header{ max-width:900px; margin:0 auto 10px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; }
+.roster-header h2{ font-family:'Cinzel',serif; font-size:16px; color:#e08a7a; margin:0; }
+.hint-text{ font-size:12.5px; color:#8a9a91; font-style:italic; }
+.max-badge{ font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; font-weight:normal; }
+.creation-banner{
+  margin-bottom:18px; padding:12px 18px; border-radius:10px; text-align:center;
+  background:linear-gradient(180deg, rgba(201,162,39,0.14), rgba(201,162,39,0.08));
+  border:1px solid rgba(201,162,39,0.5); color:#e8d488; font-size:14px; line-height:1.5;
+}
+.creation-banner strong{ font-family:'Cinzel',serif; }
+.creation-tally{
+  margin-top:10px; padding-top:10px; border-top:1px solid rgba(201,162,39,0.3);
+  display:flex; flex-wrap:wrap; gap:6px 14px; justify-content:center;
+  font-family:'Space Mono',monospace; font-size:11px; color:#cabf9e;
+}
+.creation-tally span{ white-space:nowrap; }
+.creation-tally .over{ color:#e08a7a; }
+.creation-tally .exact{ color:#8fd68f; }
+.bulk-xp{
+  max-width:900px; margin:0 auto 16px; padding:12px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  justify-content:center; background:rgba(15,30,25,0.5); border:1px solid #3a544b; border-radius:8px;
+}
+.bulk-xp input[type=number]{ width:80px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px; padding:8px 10px; font-family:'Space Mono',monospace; }
+.bulk-xp input[type=text]{ background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px; padding:8px 10px; font-family:'EB Garamond',serif; }
+.roster{ max-width:900px; margin:0 auto 24px; display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+.roster-card.npc{ border-color:#5a3a3a; }
+.roster-card.npc:hover, .roster-card.npc.active{ border-color:#e08a7a; }
+.roster-card{
+  padding:10px 16px; border:1px solid #3a544b; border-radius:8px; cursor:pointer; background:rgba(15,30,25,0.6);
+  font-size:14px; transition:border-color .15s ease, transform .15s ease;
+}
+.roster-card:hover{ border-color:#c9a227; transform:translateY(-2px); }
+.roster-card.active{ border-color:#c9a227; background:rgba(201,162,39,0.12); }
+.roster-card .name{ font-family:'Cinzel',serif; color:#ddc677; }
+.roster-card .concept{ font-size:11.5px; color:#8a9a91; font-style:italic; }
+
+/* ---- sheet layout ---- */
+.sheet{ max-width:900px; margin:0 auto; padding:0 20px; }
+.sheet-section{
+  background:linear-gradient(180deg, rgba(19,36,32,0.65), rgba(13,24,21,0.75));
+  border:1px solid #3a544b; border-radius:12px; padding:18px 22px; margin-bottom:18px;
+}
+.sheet-section h2{ font-family:'Cinzel',serif; font-size:17px; color:#ddc677; margin:0 0 14px; letter-spacing:0.5px; border-bottom:1px solid #3a544b; padding-bottom:8px; }
+.field-row{ display:flex; flex-wrap:wrap; gap:14px; margin-bottom:12px; }
+.field{ flex:1; min-width:180px; }
+.field label{ display:block; font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }
+.field input[type=text]{
+  width:100%; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:8px 10px; font-family:'EB Garamond',serif; font-size:14px;
+}
+.field input[type=text]:focus{ outline:none; border-color:#c9a227; }
+.field select{
+  width:100%; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:8px 10px; font-family:'EB Garamond',serif; font-size:14px;
+}
+.field select:focus{ outline:none; border-color:#c9a227; }
+.creation-toggle{
+  display:flex; align-items:center; gap:8px; padding:8px 10px; background:rgba(5,12,10,0.6);
+  border:1px solid #3a544b; border-radius:6px; font-size:13px; color:#e9dfc4; cursor:pointer;
+}
+.creation-toggle input{ width:16px; height:16px; accent-color:#c9a227; }
+.field input:disabled, .sheet.readonly textarea:disabled{ opacity:0.75; cursor:not-allowed; }
+
+.trait-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px,1fr)); gap:10px 20px; }
+.trait-cat{ margin-bottom:14px; }
+.trait-cat h3{ font-family:'Cinzel',serif; font-size:13px; color:#b7ad8e; margin:0 0 8px; letter-spacing:0.5px; }
+.trait-row{ display:flex; align-items:center; justify-content:space-between; padding:3px 0; }
+.trait-row .tname{ font-size:13.5px; color:#e9dfc4; }
+.dots{ display:flex; gap:3px; flex:none; }
+.dot-pip{
+  width:12px; height:12px; border-radius:50%; border:1.5px solid #c9a227; cursor:pointer;
+  transition: background .1s ease;
+}
+.dot-pip.filled{ background:#c9a227; }
+.sheet.readonly .dot-pip{ cursor:default; }
+
+.pool-row{ display:flex; align-items:center; gap:10px; }
+.pool-row input[type=number]{
+  width:70px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:7px 10px; font-family:'Space Mono',monospace; font-size:14px;
+}
+
+.paradox-section{ border-color:#7a3a2a; background:linear-gradient(180deg, rgba(36,19,13,0.65), rgba(24,13,9,0.75)); }
+.paradox-section h2{ color:#e08a6a; border-bottom-color:#5a3a2a; }
+.paradox-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.paradox-dots .dot-pip{ border-color:#e08a6a; }
+.paradox-dots .dot-pip.filled{ background:#d6704f; }
+.paradox-row input[type=number]{
+  width:70px; background:rgba(5,12,10,0.6); border:1px solid #7a3a2a; color:#e9dfc4; border-radius:6px;
+  padding:7px 10px; font-family:'Space Mono',monospace; font-size:14px;
+}
+.paradox-note{ margin-top:10px; font-size:12px; color:#b89a8a; font-style:italic; line-height:1.4; }
+
+.quintessence-section{ border-color:#2c6a6e; background:linear-gradient(180deg, rgba(13,32,34,0.65), rgba(9,22,24,0.75)); }
+.quintessence-section h2{ color:#7fe0d6; border-bottom-color:#2c6a6e; }
+.quintessence-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+.quintessence-dots .dot-pip{ border-color:#7fe0d6; }
+.quintessence-dots .dot-pip.filled{ background:#3fc9bc; }
+.quintessence-row input[type=number]{
+  width:70px; background:rgba(5,12,10,0.6); border:1px solid #2c6a6e; color:#e9dfc4; border-radius:6px;
+  padding:7px 10px; font-family:'Space Mono',monospace; font-size:14px;
+}
+.quintessence-note{ margin-top:10px; font-size:12px; color:#8ab8b4; font-style:italic; line-height:1.4; }
+
+.bg-row{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.bg-row input[type=text]{
+  flex:1; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:7px 10px; font-family:'EB Garamond',serif; font-size:14px;
+}
+.bg-row .remove-bg{ cursor:pointer; color:#e08a7a; font-size:16px; flex:none; }
+
+.health-row{ display:flex; align-items:center; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(58,84,75,0.4); }
+.health-row:last-child{ border-bottom:none; }
+.health-row .hname{ font-size:13.5px; color:#e9dfc4; }
+.health-row .hpenalty{ font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; margin-left:8px; }
+.health-row input[type=checkbox]{ width:18px; height:18px; accent-color:#d6704f; cursor:pointer; }
+
+.panel-head-row{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+.panel-head-row h2{ margin:0; border:none; padding:0; }
+textarea.md-text{
+  width:100%; min-height:120px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4;
+  border-radius:8px; padding:12px; font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; resize:vertical;
+}
+textarea.md-text:focus{ outline:none; border-color:#c9a227; }
+.md-content{
+  min-height:60px; padding:12px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; border-radius:8px;
+  font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; color:#e9dfc4;
+}
+.md-content:empty::before{ content:"Rien à afficher pour l'instant."; color:#7a8f83; font-style:italic; }
+.md-content h1, .md-content h2, .md-content h3{ font-family:'Cinzel',serif; color:#ddc677; margin:0 0 8px; }
+.md-content p{ margin:0 0 10px; }
+.md-content ul, .md-content ol{ margin:0 0 10px; padding-left:22px; }
+.md-content strong{ color:#f0e6c8; } .md-content em{ color:#cabf9e; }
+.md-content > *:last-child{ margin-bottom:0; }
+
+.save-status{ text-align:center; font-size:11px; font-family:'Space Mono',monospace; color:#7a8f83; margin:-6px 0 20px; }
+
+/* ---- loading & auth gate (shared pattern) ---- */
+.loading-screen{
+  position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  transition:opacity .35s ease;
+}
+.loading-screen.hide{ opacity:0; pointer-events:none; }
+.loading-inner{ text-align:center; }
+.loading-glyph{ font-size:42px; color:#ddc677; display:inline-block; animation: loading-pulse 1.6s ease-in-out infinite; text-shadow:0 0 20px rgba(221,198,119,0.5); }
+.loading-text{ margin-top:14px; font-family:'Space Mono',monospace; font-size:12px; color:#8a9a91; letter-spacing:1px; }
+@keyframes loading-pulse{ 0%,100%{ transform:scale(1) rotate(0deg); opacity:0.6; } 50%{ transform:scale(1.18) rotate(180deg); opacity:1; } }
+
+.auth-gate{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  opacity:1; transition:opacity .4s ease; pointer-events:auto;
+}
+.auth-gate.hide{ opacity:0; pointer-events:none; }
+.auth-card{
+  width:340px; max-width:calc(100vw - 40px); padding:28px 26px;
+  background:linear-gradient(180deg, rgba(19,36,32,0.95), rgba(13,24,21,0.97));
+  border:1px solid #c9a227; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.6); text-align:center;
+}
+.auth-card h1{ font-family:'Cinzel',serif; font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
+.auth-card .auth-sub{ font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:20px; }
+.auth-card input{
+  width:100%; background:rgba(5,12,10,0.7); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:10px 12px; font-family:'EB Garamond',serif; font-size:14px; margin-bottom:10px;
+}
+.auth-card input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
+.auth-card .btn{ width:100%; margin-top:4px; }
+.auth-card .auth-error{ min-height:18px; font-size:12.5px; color:#e08a7a; margin-top:10px; }
+
+.toast{
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#132420; border:1px solid #c9a227; color:#ddc677; padding:10px 18px;
+  border-radius:8px; font-size:14px; opacity:0; transition:all .3s ease; z-index:60; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.confirm-modal-backdrop{
+  position:fixed; inset:0; z-index:80; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center;
+}
+.confirm-modal{
+  width:360px; max-width:90vw; background:linear-gradient(180deg, rgba(19,36,32,0.98), rgba(13,24,21,0.99));
+  border:1px solid #c9a227; border-radius:12px; padding:22px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+}
+#confirmMessage{ font-family:'EB Garamond',serif; font-size:15px; color:#e9dfc4; line-height:1.5; margin-bottom:18px; }
+.confirm-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+.temp-track{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.temp-pip{
+  width:13px; height:13px; border:1.5px solid #8a9a91; border-radius:2px; cursor:pointer; flex:none;
+}
+.temp-pip.filled{ background:#8a9a91; }
+.temp-track .reset-link{ font-size:11px; color:#8fd6ff; cursor:pointer; text-decoration:underline; margin-left:4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <button class="btn ghost" id="btnBack">← Atlas</button>
+    <h1>Fiches de Personnages</h1>
+  </div>
+  <div class="tools">
+    <div class="xp-badge-top" id="xpBadgeTop" style="display:none;">✦ XP <span id="xpBadgeValue">0</span></div>
+    <div class="user-badge" id="userBadge" style="display:none;">
+      <span id="userEmail"></span><button id="btnLogout">se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="privacy-note">🔒 Chaque fiche est privée — visible uniquement par son propriétaire et le Meneur de Jeu.</div>
+
+<div class="bulk-xp" id="bulkXp" style="display:none;">
+  <span class="hint-text">Attribuer à tous les joueurs :</span>
+  <input type="number" id="bulkXpAmount" placeholder="Ex: 5">
+  <input type="text" id="bulkXpNote" placeholder="Motif (optionnel)">
+  <button class="btn small" id="btnBulkXp">Attribuer à tous les PJ</button>
+</div>
+
+<div class="roster" id="roster" style="display:none;"></div>
+
+<div class="roster-header" id="npcHeader" style="display:none;">
+  <h2>Antagonistes</h2>
+  <button class="btn ghost small" id="btnNewNpc">+ Nouvel antagoniste</button>
+</div>
+<div class="roster" id="npcRoster" style="display:none;"></div>
+
+<div class="sheet" id="sheet" style="display:none;">
+  <div class="creation-banner" id="creationBanner" style="display:none;">
+    ✦ Fiche en <strong>mode création</strong> — répartis tes points librement, rien ne coûte d'XP.
+    Passe en « Campagne en cours » (section Identité) une fois le personnage terminé.
+    <div class="creation-tally" id="creationTally"></div>
+  </div>
+  <div class="sheet-section">
+    <h2>Identité</h2>
+    <div class="field-row">
+      <div class="field"><label>Nom</label><input type="text" id="f_name" placeholder="Nom du personnage"></div>
+      <div class="field"><label>Joueur</label><input type="text" id="f_player" placeholder="Ton nom"></div>
+      <div class="field"><label>Chronique</label><input type="text" id="f_chronicle" placeholder="Nom de la campagne"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Nature</label><input type="text" id="f_nature" placeholder="Ex: Visionnaire"></div>
+      <div class="field"><label>Attitude</label><input type="text" id="f_demeanor" placeholder="Ex: Bohème"></div>
+      <div class="field">
+        <label>Essence</label>
+        <select id="f_essence">
+          <option value="">— à choisir —</option>
+          <option>Dynamique</option><option>Motivée</option><option>Primordiale</option><option>Questive</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Affiliation</label><input type="text" id="f_affiliation" placeholder="Ex: Ordre d'Hermès"></div>
+      <div class="field"><label>Secte</label><input type="text" id="f_faction" placeholder="Ex: Traditions"></div>
+      <div class="field"><label>Concept</label><input type="text" id="f_concept" placeholder="Ex: Hacker idéaliste"></div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Sphère d'affinité</label>
+        <select id="f_affinitySphere"></select>
+      </div>
+      <div class="field">
+        <label>Statut de la fiche</label>
+        <label class="creation-toggle">
+          <input type="checkbox" id="f_creationMode">
+          <span id="creationModeLabel">Mode création (points gratuits)</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Attributs</h2>
+    <div class="trait-grid" id="attrGrid"></div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Talents</h2>
+    <div class="trait-grid" id="talentsGrid"></div>
+  </div>
+  <div class="sheet-section">
+    <h2>Compétences</h2>
+    <div class="trait-grid" id="skillsGrid"></div>
+  </div>
+  <div class="sheet-section">
+    <h2>Connaissances</h2>
+    <div class="trait-grid" id="knowledgesGrid"></div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Sphères</h2>
+    <div class="trait-grid" id="spheresGrid"></div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Arété, Volonté</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>Arété <span class="max-badge" id="areteMaxBadge">(max 1)</span></label>
+        <div class="dots" id="areteDots"></div>
+        <div class="hint-text">Clique un point vide pour l'acheter (coûte de l'XP)</div>
+        <label style="margin-top:8px;">Points d'Arété dépensés</label>
+        <div class="temp-track" id="areteTempTrack"></div>
+      </div>
+      <div class="field">
+        <label>Volonté <span class="max-badge" id="willpowerMaxBadge">(max 1)</span></label>
+        <div class="dots" id="willpowerDots"></div>
+        <div class="hint-text">Clique un point vide pour l'acheter (coûte de l'XP)</div>
+        <label style="margin-top:8px;">Points de Volonté dépensés</label>
+        <div class="temp-track" id="willpowerTempTrack"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-section quintessence-section">
+    <h2>Quintessence</h2>
+    <div class="quintessence-row">
+      <div class="dots quintessence-dots" id="quintessenceDots"></div>
+      <input type="number" id="f_quintessence" min="0" max="99">
+    </div>
+    <div class="quintessence-note">Énergie primordiale pure — puisée à un Nœud, une Ligne de Force, ou accordée par l'Avatar. Alimente les effets magiques coïncidentaux et vulgaires.</div>
+  </div>
+
+  <div class="sheet-section paradox-section">
+    <h2>Paradoxe</h2>
+    <div class="paradox-row">
+      <div class="dots paradox-dots" id="paradoxDots"></div>
+      <input type="number" id="f_paradox" min="0" max="99">
+    </div>
+    <div class="paradox-note">Accumulé par l'usage de magie vulgaire ou par une coïncidentale ratée — se dissipe avec le temps ou explose en effets de retour.</div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Santé <span class="max-badge" id="healthPenaltyBadge"></span></h2>
+    <div id="healthTrack"></div>
+  </div>
+
+  <div class="sheet-section" id="xpSection">
+    <h2>Points d'Expérience</h2>
+    <div class="field-row">
+      <div class="field pool-row"><label style="width:100%">XP disponible</label><span id="xpPoolDisplay" style="font-family:'Cinzel',serif; font-size:22px; color:#ddc677;">0</span></div>
+    </div>
+    <div id="xpGmGrant" style="display:none; gap:10px; align-items:center; margin-top:8px;">
+      <input type="number" id="xpGrantAmount" placeholder="Ex: 5" style="width:90px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px; padding:8px 10px; font-family:'Space Mono',monospace;">
+      <button class="btn small" id="btnGrantXp">Attribuer</button>
+      <input type="text" id="xpGrantNote" placeholder="Motif (optionnel)" style="flex:1; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px; padding:8px 10px; font-family:'EB Garamond',serif;">
+    </div>
+    <div id="xpLogBox" style="margin-top:12px; font-size:12px; color:#8a9a91; font-family:'Space Mono',monospace; max-height:120px; overflow-y:auto;"></div>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Antécédents (Backgrounds)</h2>
+    <div id="bgList"></div>
+    <button class="btn ghost small" id="btnAddBg">+ Ajouter un antécédent</button>
+  </div>
+
+  <div class="sheet-section">
+    <h2>Autres traits</h2>
+    <div id="otherTraitsList"></div>
+    <button class="btn ghost small" id="btnAddOtherTrait">+ Ajouter un trait</button>
+  </div>
+
+  <div class="sheet-section">
+    <div class="panel-head-row"><h2>Foyers, rituels, instruments</h2><button class="btn ghost small" id="fociPreviewToggle">Aperçu</button></div>
+    <textarea class="md-text" id="f_foci" placeholder="Foyers (Foci), instruments, rituels personnels... (Markdown supporté)"></textarea>
+    <div class="md-content" id="fociPreviewBox" style="display:none;"></div>
+  </div>
+
+  <div class="sheet-section">
+    <div class="panel-head-row"><h2>Notes de background & historique</h2><button class="btn ghost small" id="notesPreviewToggle">Aperçu</button></div>
+    <textarea class="md-text" id="f_notes" placeholder="Histoire du personnage, notes de campagne libres... (Markdown supporté)"></textarea>
+    <div class="md-content" id="notesPreviewBox" style="display:none;"></div>
+  </div>
+
+  <div class="save-status" id="saveStatus">&nbsp;</div>
+  <div style="text-align:center; margin-bottom:20px;">
+    <button class="btn danger small" id="btnDeleteNpc" style="display:none;">🗑 Supprimer cet antagoniste</button>
+  </div>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-inner">
+    <div class="loading-glyph">⊕</div>
+    <div class="loading-text">Chargement de l'Atlas…</div>
+  </div>
+</div>
+
+<div class="auth-gate hide" id="authGate">
+  <div class="auth-card">
+    <h1>Atlas de l'Umbra</h1>
+    <div class="auth-sub">Connexion requise pour accéder aux fiches</div>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn" id="btnLogin">Se connecter</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div class="confirm-modal-backdrop" id="confirmBackdrop" style="display:none;">
+  <div class="confirm-modal">
+    <div id="confirmMessage"></div>
+    <div class="confirm-actions">
+      <button class="btn ghost small" id="confirmCancel">Annuler</button>
+      <button class="btn small" id="confirmOk">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- character sheet schema ---------------- */
+const ATTRIBUTES = {
+  "Physique": ["Force","Dextérité","Vigueur"],
+  "Social": ["Charisme","Manipulation","Apparence"],
+  "Mental": ["Perception","Intelligence","Astuce"]
+};
+const TALENTS = ["Art","Athlétisme","Bagarre","Commandement","Empathie","Expérience de la rue","Expression","Intimidation","Intuition","Subterfuge","Vigilance"];
+const SKILLS = ["Armes à feu","Artisanats","Arts martiaux","Conduite","Étiquette","Furtivité","Méditation","Mêlée","Recherche","Survie","Technologie"];
+const KNOWLEDGES = ["Cosmologie","Droit","Énigmes","Érudition","Ésotérisme","Informatique","Investigation","Médecine","Occultisme","Politique","Sciences"];
+const SPHERES = ["Correspondance","Entropie","Esprit","Forces","Matière","Prime","Psyché","Temps","Vie"];
+const HEALTH_LEVELS = [
+  {label:"Contusion", penalty:"0"},
+  {label:"Blessure légère", penalty:"-1"},
+  {label:"Blessure moyenne", penalty:"-1"},
+  {label:"Blessure grave", penalty:"-2"},
+  {label:"Handicap", penalty:"-2"},
+  {label:"Infirmité", penalty:"-5"},
+  {label:"Invalidité", penalty:"—"}
+];
+
+function emptySheet(ownerEmail){
+  const sk = arr => Object.fromEntries(arr.map(n=>[n,0]));
+  return {
+    ownerEmail: ownerEmail||"",
+    identity:{ name:"", player:"", chronicle:"", concept:"", affiliation:"", faction:"", nature:"", demeanor:"", essence:"", affinitySphere:"" },
+    health: [false,false,false,false,false,false,false],
+    otherTraits: [],
+    attributes:{ Force:1,Dextérité:1,Vigueur:1, Charisme:1,Manipulation:1,Apparence:1, Perception:1,Intelligence:1,Astuce:1 },
+    talents: sk(TALENTS), skills: sk(SKILLS), knowledges: sk(KNOWLEDGES),
+    spheres: sk(SPHERES),
+    arete: 1, willpower: 1, quintessence: 0, paradox: 0,
+    areteSpent: 0, willpowerSpent: 0, // number of points currently checked off as used (0 = fully rested)
+    backgrounds: [],
+    foci: "", notes: "",
+    xp: 0, xpLog: [], creationMode: true
+  };
+}
+
+/* Mage 20e XP cost chart (cost to raise FROM the current rating to the next dot) */
+const XP_COSTS = {
+  attribute: cur => cur*4,
+  ability:   cur => cur===0 ? 3 : cur*2,
+  // sphere cost depends on whether it's the character's affinity sphere (x7) or not (x8);
+  // see the sphere-specific closure built at the sphere grid render site below.
+  sphereFor: (data, sphereName) => cur => cur===0 ? 10 : cur*(data.identity.affinitySphere===sphereName ? 7 : 8),
+  arete:     cur => cur*8,
+  willpower: cur => cur*1,
+  background:cur => cur*3
+};
+async function trySpendXP(data, cost, note, onApprove){
+  if(!cost || cost<=0){ onApprove(); return; }
+  const available = data.xp||0;
+  if(available < cost){ toast(`Pas assez de XP — coût ${cost}, disponible ${available}.`); return; }
+  const ok = await customConfirm(`Dépenser ${cost} XP pour ${note} ? (il te restera ${available-cost})`);
+  if(!ok) return;
+  data.xp = available - cost;
+  data.xpLog = data.xpLog || [];
+  data.xpLog.push({delta:-cost, note, at: Date.now()});
+  onApprove();
+}
+function makeDotHandler(data, ref, editable, getCur, setVal, costFn, label){
+  return async (v)=>{
+    const cur = getCur();
+    const creationMode = !!data.creationMode;
+    if(!editable || !costFn || creationMode){
+      // free-form: character creation, or a read-only viewer (GM) — no XP involved
+      setVal(v); scheduleSave(ref); renderSheet(data, ref, editable);
+      return;
+    }
+    const traitLabel = label || "ce trait";
+    if(v > cur){
+      // buying new dots: sum the cost of each dot from cur up to v (levels are not equal cost)
+      let total = 0;
+      for(let i=cur;i<v;i++) total += costFn(i);
+      trySpendXP(data, total, `${traitLabel} (${cur} → ${v})`, ()=>{ setVal(v); scheduleSave(ref); renderSheet(data, ref, editable); });
+    } else if(v < cur){
+      // giving back dots: refund what those specific dots would have cost
+      let refund = 0;
+      for(let i=v;i<cur;i++) refund += costFn(i);
+      if(refund > 0 && !(await customConfirm(`Réduire ${traitLabel} de ${cur} à ${v} et récupérer ${refund} XP ?`))) return;
+      if(refund > 0){
+        data.xp = (data.xp||0) + refund;
+        data.xpLog = data.xpLog || [];
+        data.xpLog.push({delta:refund, note:`${traitLabel} (${cur} → ${v}, remboursement)`, at: Date.now()});
+      }
+      setVal(v); scheduleSave(ref); renderSheet(data, ref, editable);
+    } else {
+      setVal(v); scheduleSave(ref); renderSheet(data, ref, editable);
+    }
+  };
+}
+
+/* ---------------- dot-rating widget ---------------- */
+function buildDots(container, value, max, onChange, readonly, titleFn){
+  container.classList.add("dots");
+  container.innerHTML = "";
+  for(let i=1;i<=max;i++){
+    const pip = document.createElement("span");
+    pip.className = "dot-pip" + (i<=value ? " filled" : "");
+    if(titleFn){
+      const target = (value === i) ? i-1 : i;
+      pip.title = titleFn(target);
+    }
+    if(!readonly){
+      pip.addEventListener("click", ()=>{
+        const newVal = (value === i) ? i-1 : i;
+        onChange(newVal);
+      });
+    }
+    container.appendChild(pip);
+  }
+}
+
+/* tooltip text previewing the XP cost/refund of clicking a dot (campaign mode only) */
+function makeXpTitleFn(data, getCur, costFn){
+  if(data.creationMode || !costFn) return null;
+  return (target)=>{
+    const cur = getCur();
+    if(target > cur){
+      let total = 0;
+      for(let i=cur;i<target;i++) total += costFn(i);
+      return `Passer à ${target} — coûte ${total} XP`;
+    }
+    if(target < cur){
+      let refund = 0;
+      for(let i=target;i<cur;i++) refund += costFn(i);
+      return `Réduire à ${target} — rembourse ${refund} XP`;
+    }
+    return "";
+  };
+}
+
+/* checkable "currently available" track (e.g. Volonté/Arété temporary points spent in play) */
+function buildTempTrack(container, max, current, onChange, readonly){
+  container.innerHTML = "";
+  for(let i=1;i<=max;i++){
+    const pip = document.createElement("span");
+    pip.className = "temp-pip" + (i<=current ? " filled" : "");
+    if(!readonly){
+      pip.addEventListener("click", ()=>{
+        const newVal = (current === i) ? i-1 : i;
+        onChange(newVal);
+      });
+    }
+    container.appendChild(pip);
+  }
+  if(!readonly && max>0){
+    const reset = document.createElement("span");
+    reset.className = "reset-link"; reset.textContent = "tout marquer disponible";
+    reset.addEventListener("click", ()=> onChange(0));
+    container.appendChild(reset);
+  }
+}
+
+/* ---------------- toast ---------------- */
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
+}
+function customConfirm(message){
+  return new Promise(resolve=>{
+    const backdrop = document.getElementById("confirmBackdrop");
+    const okBtn = document.getElementById("confirmOk");
+    const cancelBtn = document.getElementById("confirmCancel");
+    document.getElementById("confirmMessage").textContent = message;
+    backdrop.style.display = "flex";
+    function cleanup(result){
+      backdrop.style.display = "none";
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    }
+    function onOk(){ cleanup(true); }
+    function onCancel(){ cleanup(false); }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
+function renderMarkdown(text){
+  if(!text) return "";
+  return DOMPurify.sanitize(marked.parse(text, { breaks:true }), { ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#)/i });
+}
+
+/* ---------------- Firebase ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyCsN-mEZWfxzkNckNDYackhn2cYu-VSFXQ",
+  authDomain: "umap-50aa5.firebaseapp.com",
+  projectId: "umap-50aa5",
+  storageBucket: "umap-50aa5.firebasestorage.app",
+  messagingSenderId: "1081078775679",
+  appId: "1:1081078775679:web:aeac0b5d98de5b7b7e244a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+/* TODO: replace with the GM's real Firebase Auth UID (Console → Authentication → Users) */
+const GM_UID = "CU7bYNwcZMcekGHqTFVVOMyZ8kX2";
+
+document.getElementById("btnBack").addEventListener("click", ()=>{ location.href = "atlas_umbra_3d_prototype.html"; });
+
+async function doLogin(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Renseigne l'email et le mot de passe."; return; }
+  try{ await auth.signInWithEmailAndPassword(email, password); }
+  catch(e){ errEl.textContent = "Connexion refusée — vérifie l'email et le mot de passe."; }
+}
+document.getElementById("btnLogin").addEventListener("click", doLogin);
+document.getElementById("authEmail").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("authPassword").focus(); });
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+document.getElementById("btnLogout").addEventListener("click", ()=> auth.signOut());
+
+let currentUser = null;
+let viewingUid = null;   // whose sheet is currently displayed
+let isOwner = false;     // can the current user edit the displayed sheet?
+let sheetUnsub = null;
+
+auth.onAuthStateChanged(user=>{
+  document.getElementById("loadingScreen").classList.add("hide");
+  const gate = document.getElementById("authGate");
+  const badge = document.getElementById("userBadge");
+  if(user){
+    gate.classList.add("hide");
+    badge.style.display = "flex";
+    document.getElementById("userEmail").textContent = user.email;
+    currentUser = user;
+    initForUser(user);
+  } else {
+    gate.classList.remove("hide");
+    badge.style.display = "none";
+    currentUser = null;
+    if(sheetUnsub){ sheetUnsub(); sheetUnsub = null; }
+    document.getElementById("roster").style.display = "none";
+    document.getElementById("sheet").style.display = "none";
+    document.getElementById("xpBadgeTop").style.display = "none";
+  }
+});
+
+const npcsRef = db.collection("npcs");
+
+async function initForUser(user){
+  const isGM = user.uid === GM_UID;
+  if(isGM){
+    // the GM has no personal character sheet — just the player roster and NPCs
+    document.getElementById("bulkXp").style.display = "flex";
+    await loadRoster();
+    await loadNpcRoster();
+  } else {
+    document.getElementById("bulkXp").style.display = "none";
+    document.getElementById("roster").style.display = "none";
+    document.getElementById("npcHeader").style.display = "none";
+    document.getElementById("npcRoster").style.display = "none";
+    viewSheet(user.uid, true, user.email, "characters");
+  }
+}
+
+document.getElementById("btnBulkXp").addEventListener("click", async ()=>{
+  const amount = parseInt(document.getElementById("bulkXpAmount").value);
+  if(!amount){ toast("Indique un montant."); return; }
+  const note = document.getElementById("bulkXpNote").value.trim() || "attribution MJ (groupe)";
+  try{
+    const snap = await db.collection("characters").get();
+    const playerDocs = snap.docs.filter(doc=> doc.id !== currentUser.uid);
+    if(!playerDocs.length){ toast("Aucun joueur à créditer."); return; }
+    await Promise.all(playerDocs.map(doc=> doc.ref.set({
+      xp: firebase.firestore.FieldValue.increment(amount),
+      xpLog: firebase.firestore.FieldValue.arrayUnion({delta:amount, note, at: Date.now()})
+    }, {merge:true})));
+    document.getElementById("bulkXpAmount").value = "";
+    document.getElementById("bulkXpNote").value = "";
+    toast(`${amount} XP attribués à ${playerDocs.length} joueur(s).`);
+    // if a player's sheet is currently open, refresh its displayed XP total
+    if(viewingUid && document.getElementById("sheet").style.display !== "none") viewSheet(viewingUid, isOwner, null, "characters");
+  }catch(e){ console.error(e); toast("Échec de l'attribution groupée."); }
+});
+
+async function loadNpcRoster(){
+  document.getElementById("npcHeader").style.display = "flex";
+  const rosterEl = document.getElementById("npcRoster");
+  rosterEl.style.display = "flex";
+  rosterEl.innerHTML = '<div class="hint-text">Chargement des antagonistes…</div>';
+  try{
+    const snap = await npcsRef.get();
+    rosterEl.innerHTML = "";
+    if(snap.empty){ rosterEl.innerHTML = '<div class="hint-text">Aucun antagoniste créé pour l\'instant.</div>'; }
+    snap.forEach(doc=>{
+      const data = doc.data();
+      const card = document.createElement("div");
+      card.className = "roster-card npc"; card.id = "rosterCard_"+doc.id;
+      const name = (data.identity && data.identity.name) ? data.identity.name : "(sans nom)";
+      const concept = (data.identity && data.identity.concept) ? data.identity.concept : "";
+      card.innerHTML = `<div class="name">${escapeHtml(name)}</div><div class="concept">${escapeHtml(concept)}</div>`;
+      card.addEventListener("click", ()=> viewSheet(doc.id, true, null, "npcs"));
+      rosterEl.appendChild(card);
+    });
+  }catch(e){ console.error(e); rosterEl.innerHTML = '<div class="hint-text">Erreur de chargement des antagonistes.</div>'; }
+}
+document.getElementById("btnNewNpc").addEventListener("click", async ()=>{
+  try{
+    const ref = await npcsRef.add(emptySheet());
+    await loadNpcRoster();
+    viewSheet(ref.id, true, null, "npcs");
+  }catch(e){ console.error(e); toast("Échec de la création de l'antagoniste."); }
+});
+
+async function loadRoster(){
+  const rosterEl = document.getElementById("roster");
+  rosterEl.style.display = "flex";
+  rosterEl.innerHTML = '<div class="hint-text">Chargement des fiches…</div>';
+  try{
+    const snap = await db.collection("characters").get();
+    rosterEl.innerHTML = "";
+    const playerDocs = snap.docs.filter(doc=> doc.id !== currentUser.uid);
+    if(!playerDocs.length){ rosterEl.innerHTML = '<div class="hint-text">Aucun joueur ne s\'est encore connecté.</div>'; }
+    playerDocs.forEach(doc=>{
+      const data = doc.data();
+      const card = document.createElement("div");
+      card.className = "roster-card"; card.id = "rosterCard_"+doc.id;
+      const name = (data.identity && data.identity.name) ? data.identity.name : (data.ownerEmail || "(sans nom)");
+      const concept = (data.identity && data.identity.concept) ? data.identity.concept : "";
+      card.innerHTML = `<div class="name">${escapeHtml(name)}</div><div class="concept">${escapeHtml(concept)}</div>`;
+      card.addEventListener("click", ()=> viewSheet(doc.id, false, null, "characters"));
+      rosterEl.appendChild(card);
+    });
+  }catch(e){ console.error(e); rosterEl.innerHTML = '<div class="hint-text">Erreur de chargement des fiches.</div>'; }
+}
+
+function escapeHtml(text){
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+
+function viewSheet(uid, editable, ownerEmail, collectionName){
+  collectionName = collectionName || "characters";
+  if(sheetUnsub){ sheetUnsub(); sheetUnsub = null; }
+  viewingUid = uid; isOwner = editable;
+  document.getElementById("sheet").style.display = "block";
+  document.getElementById("sheet").classList.toggle("readonly", !editable);
+  [...document.querySelectorAll(".roster-card")].forEach(c=> c.classList.toggle("active", c.id === "rosterCard_"+uid));
+
+  const ref = db.collection(collectionName).doc(uid);
+  const isNpc = collectionName === "npcs";
+  sheetUnsub = ref.onSnapshot(snap=>{
+    if(!snap.exists && editable && !isNpc){
+      // register this player in the characters collection right away, so the GM
+      // sees them in the roster even before they've typed anything into their sheet.
+      ref.set(emptySheet(ownerEmail)).catch(err=> console.error(err));
+      return; // the .set() above will re-trigger this same onSnapshot with the new doc
+    }
+    const data = snap.exists ? Object.assign(emptySheet(ownerEmail), snap.data()) : emptySheet(ownerEmail);
+    renderSheet(data, ref, editable, isNpc);
+  }, err=>{ console.error(err); toast("Impossible de charger cette fiche."); });
+}
+
+document.getElementById("btnDeleteNpc").addEventListener("click", async ()=>{
+  if(!viewingUid) return;
+  if(!(await customConfirm("Supprimer définitivement cet antagoniste ?"))) return;
+  try{
+    await npcsRef.doc(viewingUid).delete();
+    document.getElementById("sheet").style.display = "none";
+    viewingUid = null;
+    await loadNpcRoster();
+    toast("Antagoniste supprimé.");
+  }catch(e){ console.error(e); toast("Échec de la suppression."); }
+});
+
+let currentSheetData = null;
+let saveTimer = null;
+
+/* live tally shown in the creation banner so players can self-check their spread
+   against the Mage 20e creation rules (attributes 7/5/3, abilities 13/9/5, etc.) */
+function renderCreationTally(data){
+  const el = document.getElementById("creationTally");
+  const attrCat = cat => ATTRIBUTES[cat].reduce((s,n)=> s+(data.attributes[n]||1), 0) - ATTRIBUTES[cat].length;
+  const sum = obj => Object.values(obj||{}).reduce((s,v)=> s+(v||0), 0);
+  const attrs = {Physique: attrCat("Physique"), Social: attrCat("Social"), Mental: attrCat("Mental")};
+  const attrTotal = attrs.Physique + attrs.Social + attrs.Mental;
+  const abil = {Talents: sum(data.talents), Compétences: sum(data.skills), Connaissances: sum(data.knowledges)};
+  const abilTotal = abil.Talents + abil.Compétences + abil.Connaissances;
+  const sph = sum(data.spheres);
+  const bg = (data.backgrounds||[]).reduce((s,b)=> s+(b.rating||0), 0);
+
+  function cls(actual, target){ return actual===target ? "exact" : (actual>target ? "over" : ""); }
+  el.innerHTML = [
+    `<span class="${cls(attrTotal,15)}">Attributs : ${attrs.Physique}/${attrs.Social}/${attrs.Mental} (total ${attrTotal}, attendu 7+5+3)</span>`,
+    `<span class="${cls(abilTotal,27)}">Capacités : T${abil.Talents} C${abil.Compétences} S${abil.Connaissances} (total ${abilTotal}, attendu 13+9+5)</span>`,
+    `<span class="${cls(sph,6)}">Sphères : ${sph}/6</span>`,
+    `<span class="${cls(bg,7)}">Historiques : ${bg}/7</span>`,
+    `<span>Volonté : ${data.willpower||1} (base 5)</span>`,
+    `<span>Arété : ${data.arete||1} (base 1)</span>`,
+    `<span>+15 points de bonus à répartir</span>`
+  ].join("");
+}
+
+function renderSheet(data, ref, editable, isNpc){
+  currentSheetData = data;
+  const dis = editable ? "" : "disabled";
+  document.getElementById("btnDeleteNpc").style.display = isNpc ? "inline-block" : "none";
+
+  document.getElementById("f_name").value = data.identity.name||"";
+  document.getElementById("f_player").value = data.identity.player||"";
+  document.getElementById("f_chronicle").value = data.identity.chronicle||"";
+  document.getElementById("f_concept").value = data.identity.concept||"";
+  document.getElementById("f_affiliation").value = data.identity.affiliation||"";
+  document.getElementById("f_faction").value = data.identity.faction||"";
+  document.getElementById("f_nature").value = data.identity.nature||"";
+  document.getElementById("f_demeanor").value = data.identity.demeanor||"";
+  ["f_name","f_player","f_chronicle","f_concept","f_affiliation","f_faction","f_nature","f_demeanor"].forEach(id=> document.getElementById(id).disabled = !editable);
+
+  const essSel = document.getElementById("f_essence");
+  essSel.value = data.identity.essence||"";
+  essSel.disabled = !editable;
+  essSel.onchange = editable ? (()=>{ data.identity.essence = essSel.value; scheduleSave(ref); }) : null;
+
+  const affSel = document.getElementById("f_affinitySphere");
+  affSel.innerHTML = '<option value="">— à choisir —</option>' + SPHERES.map(s=>`<option value="${s}">${s}</option>`).join("");
+  affSel.value = data.identity.affinitySphere||"";
+  affSel.disabled = !editable;
+  affSel.onchange = editable ? (()=>{ data.identity.affinitySphere = affSel.value; scheduleSave(ref); renderSheet(data, ref, editable, isNpc); }) : null;
+
+  // normalize before any XP logic reads it: sheets predating the flag default to creation mode,
+  // matching what the checkbox displays (otherwise the checkbox and the XP logic would disagree)
+  data.creationMode = data.creationMode !== false;
+
+  const creationChk = document.getElementById("f_creationMode");
+  creationChk.checked = data.creationMode;
+  creationChk.disabled = !editable || isNpc;
+  document.getElementById("creationModeLabel").textContent = creationChk.checked
+    ? "Mode création (points gratuits)" : "Campagne en cours (coûte de l'XP)";
+  document.getElementById("creationBanner").style.display = (data.creationMode && editable && !isNpc) ? "block" : "none";
+  if(data.creationMode && editable && !isNpc) renderCreationTally(data);
+  creationChk.onchange = editable ? (()=>{
+    data.creationMode = creationChk.checked;
+    scheduleSave(ref);
+    renderSheet(data, ref, editable, isNpc);
+  }) : null;
+
+  const attrGrid = document.getElementById("attrGrid");
+  attrGrid.innerHTML = "";
+  Object.entries(ATTRIBUTES).forEach(([cat, names])=>{
+    const catDiv = document.createElement("div"); catDiv.className = "trait-cat";
+    catDiv.innerHTML = `<h3>${cat}</h3>`;
+    names.forEach(n=>{
+      const row = document.createElement("div"); row.className = "trait-row";
+      row.innerHTML = `<span class="tname">${n}</span>`;
+      const dotsEl = document.createElement("div");
+      buildDots(dotsEl, data.attributes[n]||1, 5,
+        makeDotHandler(data, ref, editable, ()=>data.attributes[n]||1, v=>data.attributes[n]=Math.max(1,v), XP_COSTS.attribute, `Attribut : ${n}`),
+        !editable, editable ? makeXpTitleFn(data, ()=>data.attributes[n]||1, XP_COSTS.attribute) : null);
+      row.appendChild(dotsEl);
+      catDiv.appendChild(row);
+    });
+    attrGrid.appendChild(catDiv);
+  });
+
+  function renderSkillGrid(gridId, list, field){
+    const grid = document.getElementById(gridId);
+    grid.innerHTML = "";
+    list.forEach(n=>{
+      const row = document.createElement("div"); row.className = "trait-row";
+      row.innerHTML = `<span class="tname">${n}</span>`;
+      const dotsEl = document.createElement("div");
+      buildDots(dotsEl, data[field][n]||0, 5,
+        makeDotHandler(data, ref, editable, ()=>data[field][n]||0, v=>data[field][n]=Math.max(0,v), XP_COSTS.ability, `${n}`),
+        !editable, editable ? makeXpTitleFn(data, ()=>data[field][n]||0, XP_COSTS.ability) : null);
+      row.appendChild(dotsEl);
+      grid.appendChild(row);
+    });
+  }
+  renderSkillGrid("talentsGrid", TALENTS, "talents");
+  renderSkillGrid("skillsGrid", SKILLS, "skills");
+  renderSkillGrid("knowledgesGrid", KNOWLEDGES, "knowledges");
+
+  const sphGrid = document.getElementById("spheresGrid");
+  sphGrid.innerHTML = "";
+  SPHERES.forEach(n=>{
+    const row = document.createElement("div"); row.className = "trait-row";
+    row.innerHTML = `<span class="tname">${n}</span>`;
+    const dotsEl = document.createElement("div");
+    buildDots(dotsEl, data.spheres[n]||0, 5,
+      makeDotHandler(data, ref, editable, ()=>data.spheres[n]||0, v=>data.spheres[n]=Math.max(0,v), XP_COSTS.sphereFor(data, n), `Sphère : ${n}`),
+      !editable, editable ? makeXpTitleFn(data, ()=>data.spheres[n]||0, XP_COSTS.sphereFor(data, n)) : null);
+    row.appendChild(dotsEl);
+    sphGrid.appendChild(row);
+  });
+
+  buildDots(document.getElementById("areteDots"), data.arete||1, 10,
+    makeDotHandler(data, ref, editable, ()=>data.arete||1, v=>data.arete=Math.max(1,v), XP_COSTS.arete, "Arété"),
+    !editable, editable ? makeXpTitleFn(data, ()=>data.arete||1, XP_COSTS.arete) : null);
+  buildDots(document.getElementById("willpowerDots"), data.willpower||1, 10,
+    makeDotHandler(data, ref, editable, ()=>data.willpower||1, v=>data.willpower=Math.max(1,v), XP_COSTS.willpower, "Volonté"),
+    !editable, editable ? makeXpTitleFn(data, ()=>data.willpower||1, XP_COSTS.willpower) : null);
+  document.getElementById("areteMaxBadge").textContent = `(max ${data.arete||1})`;
+  document.getElementById("willpowerMaxBadge").textContent = `(max ${data.willpower||1})`;
+
+  const areteMax = data.arete||1;
+  const areteSpent = Math.min(data.areteSpent||0, areteMax);
+  buildTempTrack(document.getElementById("areteTempTrack"), areteMax, areteSpent, (v)=>{
+    data.areteSpent = v; scheduleSave(ref); renderSheet(data, ref, editable, isNpc);
+  }, !editable);
+
+  const willpowerMax = data.willpower||1;
+  const willpowerSpent = Math.min(data.willpowerSpent||0, willpowerMax);
+  buildTempTrack(document.getElementById("willpowerTempTrack"), willpowerMax, willpowerSpent, (v)=>{
+    data.willpowerSpent = v; scheduleSave(ref); renderSheet(data, ref, editable, isNpc);
+  }, !editable);
+
+  document.getElementById("f_quintessence").value = data.quintessence||0;
+  document.getElementById("f_paradox").value = data.paradox||0;
+  document.getElementById("f_quintessence").disabled = !editable;
+  document.getElementById("f_paradox").disabled = !editable;
+
+  const PARADOX_DOTS_MAX = 15;
+  buildDots(document.getElementById("paradoxDots"), Math.min(data.paradox||0, PARADOX_DOTS_MAX), PARADOX_DOTS_MAX, (v)=>{
+    data.paradox = v; scheduleSave(ref); renderSheet(data, ref, editable, isNpc);
+  }, !editable);
+
+  const QUINTESSENCE_DOTS_MAX = 20;
+  buildDots(document.getElementById("quintessenceDots"), Math.min(data.quintessence||0, QUINTESSENCE_DOTS_MAX), QUINTESSENCE_DOTS_MAX, (v)=>{
+    data.quintessence = v; scheduleSave(ref); renderSheet(data, ref, editable, isNpc);
+  }, !editable);
+
+  const bgList = document.getElementById("bgList");
+  bgList.innerHTML = "";
+  (data.backgrounds||[]).forEach((bg, i)=>{
+    const row = document.createElement("div"); row.className = "bg-row";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text"; nameInput.value = bg.name||""; nameInput.placeholder = "Nom de l'antécédent"; nameInput.disabled = !editable;
+    nameInput.addEventListener("input", ()=>{ data.backgrounds[i].name = nameInput.value; scheduleSave(ref); });
+    row.appendChild(nameInput);
+    const dotsEl = document.createElement("div");
+    buildDots(dotsEl, bg.rating||0, 5,
+      makeDotHandler(data, ref, editable, ()=>data.backgrounds[i].rating||0, v=>data.backgrounds[i].rating=Math.max(0,v), XP_COSTS.background, `Antécédent : ${bg.name||"(sans nom)"}`),
+      !editable, editable ? makeXpTitleFn(data, ()=>data.backgrounds[i].rating||0, XP_COSTS.background) : null);
+    row.appendChild(dotsEl);
+    if(editable){
+      const rm = document.createElement("span"); rm.className = "remove-bg"; rm.textContent = "✕";
+      rm.addEventListener("click", ()=>{ data.backgrounds.splice(i,1); scheduleSave(ref); renderSheet(data, ref, editable); });
+      row.appendChild(rm);
+    }
+    bgList.appendChild(row);
+  });
+  document.getElementById("btnAddBg").style.display = editable ? "inline-block" : "none";
+  document.getElementById("btnAddBg").onclick = ()=>{ data.backgrounds.push({name:"",rating:0}); scheduleSave(ref); renderSheet(data, ref, editable); };
+
+  /* other traits — same add/remove list pattern as backgrounds, but no XP cost (free-form traits) */
+  data.otherTraits = data.otherTraits || [];
+  const otherList = document.getElementById("otherTraitsList");
+  otherList.innerHTML = "";
+  data.otherTraits.forEach((t, i)=>{
+    const row = document.createElement("div"); row.className = "bg-row";
+    const nameInput = document.createElement("input");
+    nameInput.type = "text"; nameInput.value = t.name||""; nameInput.placeholder = "Nom du trait"; nameInput.disabled = !editable;
+    nameInput.addEventListener("input", ()=>{ data.otherTraits[i].name = nameInput.value; scheduleSave(ref); });
+    row.appendChild(nameInput);
+    const dotsEl = document.createElement("div");
+    buildDots(dotsEl, t.rating||0, 5, (v)=>{ data.otherTraits[i].rating=Math.max(0,v); scheduleSave(ref); renderSheet(data, ref, editable, isNpc); }, !editable);
+    row.appendChild(dotsEl);
+    if(editable){
+      const rm = document.createElement("span"); rm.className = "remove-bg"; rm.textContent = "✕";
+      rm.addEventListener("click", ()=>{ data.otherTraits.splice(i,1); scheduleSave(ref); renderSheet(data, ref, editable, isNpc); });
+      row.appendChild(rm);
+    }
+    otherList.appendChild(row);
+  });
+  document.getElementById("btnAddOtherTrait").style.display = editable ? "inline-block" : "none";
+  document.getElementById("btnAddOtherTrait").onclick = ()=>{ data.otherTraits.push({name:"",rating:0}); scheduleSave(ref); renderSheet(data, ref, editable, isNpc); };
+
+  /* health track */
+  const healthEl = document.getElementById("healthTrack");
+  healthEl.innerHTML = "";
+  data.health = data.health || [false,false,false,false,false,false,false];
+  function updateHealthBadge(){
+    let worst = -1;
+    data.health.forEach((checked, i)=>{ if(checked) worst = i; });
+    const badge = document.getElementById("healthPenaltyBadge");
+    if(worst < 0){ badge.textContent = "— indemne"; badge.style.color = ""; return; }
+    const lvl = HEALTH_LEVELS[worst];
+    badge.textContent = `— ${lvl.label.toLowerCase()}, malus ${lvl.penalty}`;
+    badge.style.color = worst >= 3 ? "#e08a7a" : "#e8c07a";
+  }
+  HEALTH_LEVELS.forEach((lvl, i)=>{
+    const row = document.createElement("div"); row.className = "health-row";
+    const chk = document.createElement("input");
+    chk.type = "checkbox"; chk.checked = !!data.health[i]; chk.disabled = !editable;
+    chk.addEventListener("change", ()=>{ data.health[i] = chk.checked; scheduleSave(ref); updateHealthBadge(); });
+    const label = document.createElement("span"); label.className = "hname";
+    label.innerHTML = `${lvl.label} <span class="hpenalty">${lvl.penalty}</span>`;
+    row.appendChild(label); row.appendChild(chk);
+    healthEl.appendChild(row);
+  });
+  updateHealthBadge();
+
+  /* XP pool + log + GM grant control */
+  document.getElementById("xpPoolDisplay").textContent = data.xp||0;
+  document.getElementById("xpBadgeValue").textContent = data.xp||0;
+  document.getElementById("xpBadgeTop").style.display = isNpc ? "none" : "flex";
+  const isGmViewer = currentUser && currentUser.uid === GM_UID;
+  const canGrant = isGmViewer && !editable && !isNpc;
+  document.getElementById("xpGmGrant").style.display = canGrant ? "flex" : "none";
+  const logBox = document.getElementById("xpLogBox");
+  const log = (data.xpLog||[]).slice(-10).reverse();
+  logBox.innerHTML = log.length ? log.map(l=>{
+    const sign = l.delta>0 ? "+" : "";
+    const when = l.at ? new Date(l.at).toLocaleDateString("fr-FR") : "";
+    return `<div>${sign}${l.delta} XP — ${escapeHtml(l.note||"")} ${when?("("+when+")"):""}</div>`;
+  }).join("") : "<div>Aucun historique.</div>";
+  document.getElementById("btnGrantXp").onclick = async ()=>{
+    const amount = parseInt(document.getElementById("xpGrantAmount").value);
+    if(!amount){ toast("Indique un montant."); return; }
+    const note = document.getElementById("xpGrantNote").value.trim() || "attribution MJ";
+    try{
+      await ref.set({
+        xp: firebase.firestore.FieldValue.increment(amount),
+        xpLog: firebase.firestore.FieldValue.arrayUnion({delta:amount, note, at: Date.now()})
+      }, {merge:true});
+      document.getElementById("xpGrantAmount").value = "";
+      document.getElementById("xpGrantNote").value = "";
+      toast(`${amount} XP attribués.`);
+    }catch(e){ console.error(e); toast("Échec de l'attribution XP."); }
+  };
+
+  document.getElementById("f_foci").value = data.foci||"";
+  document.getElementById("f_notes").value = data.notes||"";
+  document.getElementById("f_foci").disabled = !editable;
+  document.getElementById("f_notes").disabled = !editable;
+
+  // wire free-text + number inputs once per render (idempotent: clone-replace to avoid duplicate listeners)
+  wireInput("f_name", v=>data.identity.name=v, ref, editable);
+  wireInput("f_player", v=>data.identity.player=v, ref, editable);
+  wireInput("f_chronicle", v=>data.identity.chronicle=v, ref, editable);
+  wireInput("f_concept", v=>data.identity.concept=v, ref, editable);
+  wireInput("f_affiliation", v=>data.identity.affiliation=v, ref, editable);
+  wireInput("f_faction", v=>data.identity.faction=v, ref, editable);
+  wireInput("f_nature", v=>data.identity.nature=v, ref, editable);
+  wireInput("f_demeanor", v=>data.identity.demeanor=v, ref, editable);
+  wireInput("f_quintessence", v=>data.quintessence=parseInt(v)||0, ref, editable);
+  wireInput("f_paradox", v=>data.paradox=parseInt(v)||0, ref, editable);
+  wireInput("f_foci", v=>data.foci=v, ref, editable);
+  wireInput("f_notes", v=>data.notes=v, ref, editable);
+
+  setupPreview("fociPreviewToggle", "f_foci", "fociPreviewBox");
+  setupPreview("notesPreviewToggle", "f_notes", "notesPreviewBox");
+
+  document.getElementById("saveStatus").textContent = editable ? "" : "Lecture seule — seul le propriétaire peut modifier cette fiche.";
+}
+
+function wireInput(id, setter, ref, editable){
+  const el = document.getElementById(id);
+  // use the oninput property (not addEventListener) so re-wiring on every render
+  // simply replaces the previous handler instead of stacking duplicates —
+  // no need to clone the element (which would wipe out its current value).
+  el.oninput = editable ? (()=>{ setter(el.value); scheduleSave(ref); }) : null;
+}
+
+function scheduleSave(ref){
+  document.getElementById("saveStatus").textContent = "Modifications non enregistrées…";
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      await ref.set(currentSheetData);
+      document.getElementById("saveStatus").textContent = "Enregistré ✓";
+      if(viewingUid && document.getElementById("rosterCard_"+viewingUid)){
+        const nameEl = document.getElementById("rosterCard_"+viewingUid).querySelector(".name");
+        if(nameEl && viewingUid !== currentUser.uid) nameEl.textContent = currentSheetData.identity.name || "(sans nom)";
+      }
+    }catch(e){ console.error(e); toast("Échec de la sauvegarde."); document.getElementById("saveStatus").textContent = "Échec de l'enregistrement."; }
+  }, 700);
+}
+
+const previewState = {};
+function setupPreview(btnId, textareaId, boxId){
+  const btn = document.getElementById(btnId);
+  if(btn.dataset.wired) return;
+  btn.dataset.wired = "1";
+  previewState[btnId] = false;
+  btn.addEventListener("click", ()=>{
+    previewState[btnId] = !previewState[btnId];
+    const on = previewState[btnId];
+    btn.textContent = on ? "Modifier" : "Aperçu";
+    const ta = document.getElementById(textareaId), box = document.getElementById(boxId);
+    if(on) box.innerHTML = renderMarkdown(ta.value);
+    ta.style.display = on ? "none" : "block";
+    box.style.display = on ? "block" : "none";
+  });
+}
+</script>
+</body>
+</html>

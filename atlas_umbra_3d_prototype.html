@@ -1,0 +1,1510 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Atlas de l'Umbra — Prototype 3D</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Mono&display=swap');
+
+*{box-sizing:border-box;}
+html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-family:'EB Garamond',serif; color:#e9dfc4;}
+#canvasWrap{position:fixed; inset:0;}
+canvas{display:block; touch-action:none;}
+
+.topbar{
+  position:fixed; top:0; left:0; right:0; z-index:10;
+  display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  padding:16px 20px; background:linear-gradient(180deg, rgba(5,12,10,0.85), rgba(5,12,10,0));
+  pointer-events:none;
+}
+.topbar > *{pointer-events:auto;}
+.topbar h1{font-family:'Cinzel',serif; font-size:22px; margin:0; letter-spacing:1px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8);}
+.topbar .hint{font-size:12px; color:#b7ad8e; font-style:italic; margin-top:2px;}
+
+.code-row{display:flex; gap:8px;}
+.code-row input{
+  background:rgba(15,30,25,0.85); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:8px 10px; font-family:'Space Mono',monospace; font-size:12px; text-transform:uppercase; letter-spacing:1px; width:150px;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.code-row input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
+.btn{
+  font-family:'EB Garamond',serif; font-size:14px; cursor:pointer;
+  background: linear-gradient(180deg,#ddc677,#c9a227); color:#0d1815; border:1px solid #c9a227; border-radius:6px;
+  padding:8px 14px; font-weight:600;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover{ filter:brightness(1.08); box-shadow:0 2px 14px rgba(201,162,39,0.35); transform:translateY(-1px); }
+.btn:active{ transform:translateY(0); filter:brightness(0.96); }
+.btn.ghost{ background:rgba(15,30,25,0.85); color:#e9dfc4; border:1px solid #3a544b; font-weight:400;}
+.btn.ghost:hover{ box-shadow:0 2px 14px rgba(123,191,154,0.18); border-color:#5a7a6b; }
+.btn.icon{ display:flex; align-items:center; gap:8px; }
+.btn .badge{
+  font-family:'Space Mono',monospace; font-size:10px; background:rgba(0,0,0,0.35);
+  border-radius:10px; padding:2px 7px; border:1px solid rgba(255,255,255,0.15);
+}
+
+/* ---- realm drawer (side panel listing unlocked realms) ---- */
+.realm-drawer{
+  position:fixed; top:0; right:0; bottom:0; z-index:14; width:300px; max-width:85vw;
+  background:linear-gradient(180deg, rgba(13,24,21,0.97), rgba(9,17,15,0.98));
+  border-left:1px solid #3a544b; box-shadow:-12px 0 40px rgba(0,0,0,0.55);
+  transform:translateX(100%); transition: transform .4s cubic-bezier(.22,.9,.28,1);
+  display:flex; flex-direction:column;
+}
+.realm-drawer.show{ transform:translateX(0); }
+.realm-drawer-header{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  padding:18px 18px 12px; border-bottom:1px solid #26362f;
+}
+.realm-drawer-header h3{ font-family:'Cinzel',serif; font-size:16px; margin:0; color:#ddc677; letter-spacing:0.5px; }
+.realm-drawer-header .close{ cursor:pointer; color:#b7ad8e; font-size:16px; padding:2px 4px; }
+.realm-drawer-header .close:hover{ color:#e9dfc4; }
+.realm-drawer-sub{ padding:0 18px 12px; font-size:11px; font-family:'Space Mono',monospace; color:#8a9a91; }
+.realm-drawer-search{
+  margin:0 18px 12px; width:calc(100% - 36px); background:rgba(5,12,10,0.6); border:1px solid #3a544b;
+  color:#e9dfc4; border-radius:6px; padding:8px 10px; font-family:'EB Garamond',serif; font-size:13px;
+}
+.realm-drawer-search:focus{ outline:none; border-color:#c9a227; }
+.realm-drawer-list{ flex:1; overflow-y:auto; padding:4px 10px 18px; }
+.realm-drawer-list::-webkit-scrollbar{ width:6px; }
+.realm-drawer-list::-webkit-scrollbar-thumb{ background:#3a544b; border-radius:4px; }
+.realm-drawer-cat{
+  font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; text-transform:uppercase;
+  color:#7a8f83; margin:16px 8px 6px; opacity:0.85;
+}
+.realm-drawer-item{
+  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; cursor:pointer;
+  border:1px solid transparent; transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.realm-drawer-item:hover{ background:rgba(201,162,39,0.08); border-color:rgba(201,162,39,0.35); transform:translateX(-2px); }
+.realm-drawer-item .glyph{
+  width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:13px; color:#0d1815; background: var(--accent, #7bbf9a); flex:none;
+  box-shadow:0 0 10px var(--accent, #7bbf9a);
+}
+.realm-drawer-item .names{ display:flex; flex-direction:column; min-width:0; }
+.realm-drawer-item .name{ font-size:14px; color:#e9dfc4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.realm-drawer-item .cat{ font-size:10.5px; color:#8a9a91; font-style:italic; }
+.realm-drawer-empty{ padding:16px 10px; font-size:12.5px; color:#8a9a91; font-style:italic; line-height:1.5; }
+
+.toast{
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#132420; border:1px solid #c9a227; color:#ddc677; padding:10px 18px;
+  border-radius:8px; font-size:14px; opacity:0; transition:all .3s ease; z-index:30; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* ---- touch controls (mobile) ---- */
+.touch-joystick{
+  position:fixed; left:24px; bottom:24px; z-index:12; touch-action:none;
+}
+.joystick-base{
+  width:110px; height:110px; border-radius:50%; background:rgba(15,30,25,0.6);
+  border:1px solid #3a544b; position:relative;
+}
+.joystick-knob{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:48px; height:48px; border-radius:50%;
+  background:linear-gradient(180deg,#ddc677,#c9a227); border:1px solid #8a6a1a;
+  box-shadow:0 2px 10px rgba(0,0,0,0.4);
+}
+.touch-updown{
+  position:fixed; right:24px; bottom:24px; z-index:12; display:flex; flex-direction:column; gap:10px;
+}
+.touch-btn{
+  width:52px; height:52px; border-radius:50%; background:rgba(15,30,25,0.75); border:1px solid #3a544b;
+  color:#e9dfc4; font-size:18px; touch-action:none;
+}
+.touch-btn:active{ background:rgba(201,162,39,0.3); border-color:#c9a227; }
+
+.info-panel{
+  position:fixed; left:20px; bottom:20px; z-index:10; width:300px; max-width:calc(100% - 40px);
+  background:linear-gradient(180deg, rgba(19,36,32,0.92), rgba(13,24,21,0.94));
+  backdrop-filter: blur(6px);
+  border:1px solid #c9a227; border-radius:12px; padding:16px 18px;
+  box-shadow:0 10px 40px rgba(0,0,0,0.45);
+  transform:translateY(140%); transition: transform .4s cubic-bezier(.22,.9,.28,1);
+}
+.info-panel.show{transform:translateY(0);}
+.info-panel .close{position:absolute; top:8px; right:10px; cursor:pointer; color:#b7ad8e; font-size:16px;}
+.info-panel h2{font-family:'Cinzel',serif; font-size:19px; margin:0 0 4px; color:#ddc677;}
+.info-panel .sub{font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:10px;}
+.info-panel .status{
+  display:inline-block; font-size:11px; font-family:'Space Mono',monospace; padding:3px 8px; border-radius:20px;
+  border:1px solid #3a544b; margin-bottom:10px;
+}
+.info-panel .status.unlocked{color:#8fd68f; border-color:#3f8a52;}
+.info-panel .status.locked{color:#b0938f; border-color:#5a3a3a;}
+.info-panel p.note{font-size:13px; color:#cabf9e; line-height:1.4;}
+
+.legend{
+  position:fixed; bottom:20px; right:20px; z-index:10; font-size:11px; color:#8a9a91;
+  font-family:'Space Mono',monospace; max-width:230px; text-align:right; line-height:1.5;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8);
+}
+
+#vignette{
+  position:fixed; inset:0; z-index:3; pointer-events:none;
+  background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 35%, rgba(3,7,6,0.75) 100%);
+}
+#grain{
+  position:fixed; inset:0; z-index:4; pointer-events:none; opacity:0.05; mix-blend-mode:overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- loading screen (covers the auth flash while Firebase resolves the session) ---- */
+.loading-screen{
+  position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  transition:opacity .35s ease;
+}
+.loading-screen.hide{ opacity:0; pointer-events:none; }
+.loading-inner{ text-align:center; }
+.loading-glyph{
+  font-size:42px; color:#ddc677; display:inline-block;
+  animation: loading-pulse 1.6s ease-in-out infinite;
+  text-shadow:0 0 20px rgba(221,198,119,0.5);
+}
+.loading-text{ margin-top:14px; font-family:'Space Mono',monospace; font-size:12px; color:#8a9a91; letter-spacing:1px; }
+@keyframes loading-pulse{
+  0%,100%{ transform:scale(1) rotate(0deg); opacity:0.6; }
+  50%{ transform:scale(1.18) rotate(180deg); opacity:1; }
+}
+
+/* ---- authentication gate ---- */
+.auth-gate{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  opacity:1; transition:opacity .4s ease; pointer-events:auto;
+}
+.auth-gate.hide{ opacity:0; pointer-events:none; }
+.auth-card{
+  width:340px; max-width:calc(100vw - 40px); padding:28px 26px;
+  background:linear-gradient(180deg, rgba(19,36,32,0.95), rgba(13,24,21,0.97));
+  border:1px solid #c9a227; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  text-align:center;
+}
+.auth-card h1{ font-family:'Cinzel',serif; font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
+.auth-card .auth-sub{ font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:20px; }
+.auth-card input{
+  width:100%; background:rgba(5,12,10,0.7); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:10px 12px; font-family:'EB Garamond',serif; font-size:14px; margin-bottom:10px;
+  transition:border-color .2s ease, box-shadow .2s ease;
+}
+.auth-card input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
+.auth-card .btn{ width:100%; margin-top:4px; }
+.auth-card .auth-error{ min-height:18px; font-size:12.5px; color:#e08a7a; margin-top:10px; }
+.user-badge{
+  display:flex; align-items:center; gap:8px; font-size:12px; color:#b7ad8e;
+  font-family:'Space Mono',monospace; background:rgba(15,30,25,0.85); border:1px solid #3a544b;
+  border-radius:6px; padding:7px 10px;
+}
+.user-badge button{
+  background:none; border:none; color:#ddc677; cursor:pointer; font-family:'EB Garamond',serif;
+  font-size:12px; padding:0; text-decoration:underline;
+}
+</style>
+</head>
+<body>
+
+<div id="canvasWrap"></div>
+<div id="vignette"></div>
+<div id="grain"></div>
+
+<div class="topbar">
+  <div>
+    <h1>Atlas de l'Umbra — Prototype 3D</h1>
+    <div class="hint">Glisser pour regarder autour · ZQSD/WASD pour avancer · Espace/Maj pour monter/descendre · Molette pour zoomer · Clique un royaume (y compris les nouveaux marqueurs procéduraux)</div>
+  </div>
+  <div class="code-row">
+    <button class="btn ghost icon" id="btnDrawer">☰ Royaumes <span class="badge" id="realmCountBadge">0/0</span></button>
+    <button class="btn ghost" id="btnFiches" onclick="location.href='atlas_fiches.html'">📜 Fiches</button>
+    <input type="text" id="codeInput" placeholder="CODE">
+    <button class="btn" id="btnCode">Débloquer</button>
+    <div class="user-badge" id="userBadge" style="display:none;">
+      <span id="userEmail"></span><button id="btnLogout">se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-inner">
+    <div class="loading-glyph">⊕</div>
+    <div class="loading-text">Chargement de l'Atlas…</div>
+  </div>
+</div>
+
+<div class="auth-gate hide" id="authGate">
+  <div class="auth-card">
+    <h1>Atlas de l'Umbra</h1>
+    <div class="auth-sub">Connexion requise pour accéder à l'Atlas</div>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn" id="btnLogin">Se connecter</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div class="realm-drawer" id="realmDrawer">
+  <div class="realm-drawer-header">
+    <h3>Royaumes découverts</h3>
+    <span class="close" id="drawerClose">✕</span>
+  </div>
+  <div class="realm-drawer-sub" id="realmDrawerSub">0 / 0 découverts</div>
+  <input type="text" class="realm-drawer-search" id="realmSearch" placeholder="Rechercher un royaume...">
+  <div class="realm-drawer-list" id="realmList"></div>
+</div>
+
+<div class="info-panel" id="infoPanel">
+  <span class="close" id="infoClose">✕</span>
+  <h2 id="infoName"></h2>
+  <div class="sub" id="infoSub"></div>
+  <div class="status" id="infoStatus"></div>
+  <p class="note" id="infoNote"></p>
+  <button class="btn" id="infoMapBtn" style="display:none; width:100%; margin-top:6px;">Voir la carte</button>
+</div>
+
+<div class="legend" id="legend">Un halo de couleur signale un royaume débloqué · un voile discret marque un royaume encore verrouillé · ☰ Royaumes liste tout ce que tu as découvert · assets originaux, générés proceduralement en attendant les modèles IA finaux</div>
+<div class="touch-joystick" id="touchJoystick" style="display:none;">
+  <div class="joystick-base" id="joystickBase">
+    <div class="joystick-knob" id="joystickKnob"></div>
+  </div>
+</div>
+<div class="touch-updown" id="touchUpDown" style="display:none;">
+  <button class="touch-btn" id="btnTouchUp">▲</button>
+  <button class="touch-btn" id="btnTouchDown">▼</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- data ---------------- */
+const REALMS = [
+  { id:"earth",      name:"Terre — Penumbra",     short:"Terre",     subtitle:"Le monde matériel et son reflet immédiat", glyph:"⊕", primary:0x2c5c46, accent:0x7bbf9a, ring:-1,  isCenter:true },
+  { id:"highUmbra",  name:"Haut-Umbra",           short:"Haut-Umbra",subtitle:"Contrées Astrales — Near / Far / Deep Dreaming", glyph:"◈", primary:0x2c6a6e, accent:0xa8e8e0, ring:-1, axis:"up" },
+  { id:"underworld", name:"Oblivion — Sombre Contrée", short:"Oblivion",subtitle:"Le Royaume des Morts, qui englobe tous les Royaumes Sombres", glyph:"☠", primary:0x4a4a4a, accent:0xa0a0a0, ring:-1, axis:"down" },
+  { id:"mercury",    name:"Mercure",               short:"Mercure",   subtitle:"Sphère de Correspondance", glyph:"☿", primary:0x5b6b73, accent:0xb8cdd6, ring:0 },
+  { id:"saturn",     name:"Saturne",               short:"Saturne",   subtitle:"Sphère du Temps",          glyph:"♄", primary:0x7a5a2c, accent:0xd9a94f, ring:1 },
+  { id:"neptune",    name:"Neptune",               short:"Neptune",   subtitle:"Sphère du Mental",         glyph:"♆", primary:0x2c3f7a, accent:0x7c93d6, ring:2 },
+  { id:"uranus",     name:"Uranus",                short:"Uranus",    subtitle:"Sphère de l'Esprit",       glyph:"♅", primary:0x227a6e, accent:0x5fd6c2, ring:3 },
+  { id:"pluto",      name:"Pluton",                short:"Pluton",    subtitle:"Sphère de l'Entropie",     glyph:"♇", primary:0x3a2050, accent:0xa878d6, ring:4 },
+  { id:"moon",       name:"Lune",                  short:"Lune",      subtitle:"Sphère Prime",             glyph:"☽", primary:0x8a7a4a, accent:0xeadfa8, ring:5 },
+  { id:"venus",      name:"Vénus",                 short:"Vénus",     subtitle:"Sphère de la Vie",         glyph:"♀", primary:0x3a7a3a, accent:0x8fd68f, ring:6 },
+  { id:"jupiter",    name:"Jupiter",                short:"Jupiter",   subtitle:"Sphère de la Matière",     glyph:"♃", primary:0x7a5a20, accent:0xd6ad5a, ring:7 },
+  { id:"mars",       name:"Mars",                  short:"Mars",      subtitle:"Sphère des Forces",        glyph:"♂", primary:0x7a2c20, accent:0xd6704f, ring:8 },
+  { id:"horizon",    name:"Horizon — Concordia",   short:"Horizon",   subtitle:"Bastion des Traditions Mystiques", glyph:"✦", primary:0x7a6a2c, accent:0xe8d488, ring:9 },
+];
+const RING_COUNT = 10;
+
+const CODES = {
+  "MERCURE7":"mercury","CHRONOS":"saturn","ONEIROS":"neptune","PNEUMA":"uranus","ENTROPIA":"pluto",
+  "QUINTESSENCE":"moon","GENESIS":"venus","TERRAFIRMA":"jupiter","IGNIS":"mars","CONCORDIA":"horizon",
+  "STYGIA":"underworld","ASTRALIS":"highUmbra",
+  "EREBOS":"erebus","MYTHOS":"legendaire","AESTAS":"ete","LUPUS":"wolfshome","PANGAEA":"pangaea",
+  "FLUXUS":"flux","BELLONA":"battleground","VORAGO":"abyss","FUROR":"atrocity","AETHER":"aetherial",
+  "CICATRIX":"scar","SILICA":"cyberrealm","AUTOMATA":"autochthonia",
+  "ARCHIMAGE":"ALL"
+};
+
+let unlocked = ["earth"];
+
+/* ---------------- Firebase: auth + shared unlock state ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyCsN-mEZWfxzkNckNDYackhn2cYu-VSFXQ",
+  authDomain: "umap-50aa5.firebaseapp.com",
+  projectId: "umap-50aa5",
+  storageBucket: "umap-50aa5.firebasestorage.app",
+  messagingSenderId: "1081078775679",
+  appId: "1:1081078775679:web:aeac0b5d98de5b7b7e244a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const unlockedDocRef = db.collection("shared").doc("unlocked");
+let unlockedUnsub = null;
+let firstUnlockSnapshot = true;
+
+async function pushUnlocked(){
+  try{ await unlockedDocRef.set({ list: unlocked }); }
+  catch(e){ console.error(e); toast("Erreur de synchronisation avec le serveur."); }
+}
+
+function subscribeUnlocked(){
+  if(unlockedUnsub) return;
+  firstUnlockSnapshot = true;
+  unlockedUnsub = unlockedDocRef.onSnapshot(async (snap)=>{
+    const data = snap.data();
+    if(data && Array.isArray(data.list) && data.list.length){
+      unlocked = data.list;
+    } else {
+      unlocked = ["earth"];
+      if(!snap.exists) await unlockedDocRef.set({ list: unlocked });
+    }
+    refreshUnlockVisuals(firstUnlockSnapshot);
+    firstUnlockSnapshot = false;
+  }, (err)=>{ console.error(err); toast("Connexion au serveur perdue."); });
+}
+function unsubscribeUnlocked(){
+  if(unlockedUnsub){ unlockedUnsub(); unlockedUnsub = null; }
+}
+
+async function doLogin(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Renseigne l'email et le mot de passe."; return; }
+  try{
+    await auth.signInWithEmailAndPassword(email, password);
+  }catch(e){
+    errEl.textContent = "Connexion refusée — vérifie l'email et le mot de passe.";
+  }
+}
+document.getElementById("btnLogin").addEventListener("click", doLogin);
+document.getElementById("authEmail").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("authPassword").focus(); });
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+document.getElementById("btnLogout").addEventListener("click", ()=> auth.signOut());
+
+auth.onAuthStateChanged(user=>{
+  document.getElementById("loadingScreen").classList.add("hide");
+  const gate = document.getElementById("authGate");
+  const badge = document.getElementById("userBadge");
+  if(user){
+    gate.classList.add("hide");
+    badge.style.display = "flex";
+    document.getElementById("userEmail").textContent = user.email;
+    document.getElementById("authError").textContent = "";
+    document.getElementById("authPassword").value = "";
+    subscribeUnlocked();
+  } else {
+    gate.classList.remove("hide");
+    badge.style.display = "none";
+    unsubscribeUnlocked();
+    unlocked = ["earth"];
+    refreshUnlockVisuals(true);
+  }
+});
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
+}
+function escapeRealmSearch(text){
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+
+/* ---------------- three.js setup ---------------- */
+const wrap = document.getElementById("canvasWrap");
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x050c0a);
+scene.fog = new THREE.FogExp2(0x050c0a, 0.00065);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth/window.innerHeight, 1, 5000);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+wrap.appendChild(renderer.domElement);
+
+/* lights */
+scene.add(new THREE.AmbientLight(0x2a3a34, 1.2));
+const coreLight = new THREE.PointLight(0xddc677, 2.2, 1400, 2);
+coreLight.position.set(0,0,0);
+scene.add(coreLight);
+const rim = new THREE.DirectionalLight(0x7bbf9a, 0.9);
+rim.position.set(300,500,250);
+rim.castShadow = true;
+rim.shadow.mapSize.set(1024,1024);
+rim.shadow.camera.left = -900; rim.shadow.camera.right = 900;
+rim.shadow.camera.top = 900; rim.shadow.camera.bottom = -900;
+rim.shadow.camera.near = 50; rim.shadow.camera.far = 2000;
+rim.shadow.bias = -0.0015;
+scene.add(rim);
+
+/* starfield */
+(function starfield(){
+  const N = 2200;
+  const pos = new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    const r = 1200 + Math.random()*1800;
+    const theta = Math.random()*Math.PI*2;
+    const phi = Math.acos(2*Math.random()-1);
+    pos[i*3]   = r*Math.sin(phi)*Math.cos(theta);
+    pos[i*3+1] = r*Math.cos(phi);
+    pos[i*3+2] = r*Math.sin(phi)*Math.sin(theta);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({color:0x9fc9b8, size:2.2, sizeAttenuation:true, transparent:true, opacity:0.7});
+  scene.add(new THREE.Points(geo,mat));
+})();
+
+/* helpers */
+function makeGlowTexture(hexColor){
+  const c = document.createElement('canvas'); c.width=c.height=128;
+  const ctx = c.getContext('2d');
+  const col = new THREE.Color(hexColor);
+  const r255 = Math.floor(col.r*255), g255=Math.floor(col.g*255), b255=Math.floor(col.b*255);
+  const grad = ctx.createRadialGradient(64,64,0,64,64,64);
+  grad.addColorStop(0, `rgba(${r255},${g255},${b255},0.9)`);
+  grad.addColorStop(0.4, `rgba(${r255},${g255},${b255},0.35)`);
+  grad.addColorStop(1, `rgba(${r255},${g255},${b255},0)`);
+  ctx.fillStyle = grad; ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+function makeTextTexture(text, color){
+  const c = document.createElement('canvas'); c.width=256; c.height=256;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,256,256);
+  ctx.font = "150px serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillStyle = color;
+  ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 12;
+  ctx.fillText(text, 128, 140);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ---------------- procedural low-poly builders for sub-realm markers ----------------
+   En l'absence d'accès aux exports Meshy/Hyper3D Rodin (téléchargement des .glb
+   verrouillé derrière un abonnement payant sur les deux services), ces royaumes
+   listés dans Prompts_IA_Atlas_Umbra.md sont représentés ici par des formes
+   bas-poly générées par code, à remplacer plus tard par les vrais assets .glb. */
+function jitterGeometry(geo, amount){
+  const pos = geo.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const v = new THREE.Vector3(pos.getX(i),pos.getY(i),pos.getZ(i));
+    const n = v.clone().normalize();
+    const disp = 1 + (Math.random()-0.5)*amount;
+    v.copy(n.multiplyScalar(v.length()*disp));
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+function buildJaggedRock(size, color){
+  const geo = jitterGeometry(new THREE.IcosahedronGeometry(size, 0), 0.35);
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.85, metalness:0.1, flatShading:true});
+  return new THREE.Mesh(geo, mat);
+}
+function buildLushIsland(size, color, accent){
+  const group = new THREE.Group();
+  group.add(buildJaggedRock(size, color));
+  const treeMat = new THREE.MeshStandardMaterial({color:accent, roughness:0.7, flatShading:true});
+  const n = 3+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const h = size*(0.4+Math.random()*0.3);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(size*0.13, h, 6), treeMat);
+    const ang = Math.random()*Math.PI*2, r = size*0.4*Math.random();
+    cone.position.set(Math.cos(ang)*r, size*0.55, Math.sin(ang)*r);
+    group.add(cone);
+  }
+  return group;
+}
+function buildRuinsPlatform(size, color, accent){
+  const group = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({color, roughness:0.9, flatShading:true});
+  group.add(new THREE.Mesh(new THREE.CylinderGeometry(size, size*1.05, size*0.35, 8), baseMat));
+  const pillarMat = new THREE.MeshStandardMaterial({color:accent, roughness:0.8, flatShading:true, emissive:accent, emissiveIntensity:0.15});
+  const n = 4+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const ang = (i/n)*Math.PI*2;
+    const r = size*0.65;
+    const h = size*(0.5+Math.random()*0.5);
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(size*0.14,h,size*0.14), pillarMat);
+    pillar.position.set(Math.cos(ang)*r, size*0.2+h/2, Math.sin(ang)*r);
+    pillar.rotation.y = ang;
+    group.add(pillar);
+  }
+  return group;
+}
+function buildFortress(size, color, accent){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.6, metalness:0.3, flatShading:true});
+  group.add(new THREE.Mesh(new THREE.BoxGeometry(size*1.4,size*0.9,size*1.4), mat));
+  const spireMat = new THREE.MeshStandardMaterial({color:accent, roughness:0.5, metalness:0.4, emissive:accent, emissiveIntensity:0.25, flatShading:true});
+  [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([sx,sz])=>{
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(size*0.22,size*0.9,6), spireMat);
+    spire.position.set(sx*size*0.6, size*0.9, sz*size*0.6);
+    group.add(spire);
+  });
+  const towerCenter = new THREE.Mesh(new THREE.CylinderGeometry(size*0.3,size*0.35,size*1.2,8), mat);
+  towerCenter.position.y = size*0.7;
+  group.add(towerCenter);
+  return group;
+}
+function buildCrystalCluster(size, color, accent){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.2, metalness:0.1, transparent:true, opacity:0.85, emissive:accent, emissiveIntensity:0.3, flatShading:true});
+  const n = 5+Math.floor(Math.random()*4);
+  for(let i=0;i<n;i++){
+    const h = size*(0.6+Math.random()*0.8);
+    const r = size*(0.12+Math.random()*0.1);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(r,h,5), mat);
+    const ang = Math.random()*Math.PI*2, rad = size*0.5*Math.random();
+    spike.position.set(Math.cos(ang)*rad, h/2, Math.sin(ang)*rad);
+    spike.rotation.z = (Math.random()-0.5)*0.3;
+    spike.rotation.x = (Math.random()-0.5)*0.3;
+    group.add(spike);
+  }
+  group.add(new THREE.Mesh(new THREE.IcosahedronGeometry(size*0.55,0), new THREE.MeshStandardMaterial({color, roughness:0.7, flatShading:true})));
+  return group;
+}
+function buildCreatureBlob(size, color, accent){
+  const group = new THREE.Group();
+  const body = buildJaggedRock(size, color);
+  body.scale.set(1,0.8,1.3);
+  group.add(body);
+  const hornMat = new THREE.MeshStandardMaterial({color:accent, roughness:0.5, emissive:accent, emissiveIntensity:0.35, flatShading:true});
+  const n = 2+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const horn = new THREE.Mesh(new THREE.ConeGeometry(size*0.1,size*0.55,5), hornMat);
+    horn.position.set((i-n/2)*size*0.25, size*0.5, size*0.3);
+    horn.rotation.x = -0.6+Math.random()*0.4;
+    group.add(horn);
+  }
+  return group;
+}
+function buildSerpent(size, color, accent){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.6, flatShading:true, emissive:accent, emissiveIntensity:0.2});
+  const segs = 6;
+  for(let i=0;i<segs;i++){
+    const t = i/(segs-1);
+    const r = size*0.32*(1-t*0.6);
+    const seg = new THREE.Mesh(new THREE.SphereGeometry(r,8,8), mat);
+    const ang = t*Math.PI*1.4;
+    seg.position.set(Math.cos(ang)*size*0.5*t, Math.sin(t*Math.PI)*size*0.25, Math.sin(ang)*size*0.5*t);
+    group.add(seg);
+  }
+  return group;
+}
+function buildTowerCluster(size, color, accent){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({color, roughness:0.4, metalness:0.5, flatShading:true, emissive:accent, emissiveIntensity:0.25});
+  const n = 4+Math.floor(Math.random()*3);
+  for(let i=0;i<n;i++){
+    const h = size*(0.5+Math.random()*0.9);
+    const w = size*0.18;
+    const tower = new THREE.Mesh(new THREE.BoxGeometry(w,h,w), mat);
+    const ang = (i/n)*Math.PI*2;
+    const r = size*0.35;
+    tower.position.set(Math.cos(ang)*r, h/2, Math.sin(ang)*r);
+    tower.rotation.y = ang*0.5;
+    group.add(tower);
+  }
+  group.add(new THREE.Mesh(new THREE.CylinderGeometry(size*0.5,size*0.5,size*0.15,8), new THREE.MeshStandardMaterial({color:0x111a22, roughness:0.7})));
+  return group;
+}
+function buildChalice(size, color, accent){
+  const pts = [
+    new THREE.Vector2(0,-40),new THREE.Vector2(4,-40),new THREE.Vector2(5,-10),
+    new THREE.Vector2(3,0),new THREE.Vector2(3,6),new THREE.Vector2(16,14),
+    new THREE.Vector2(24,30),new THREE.Vector2(20,44),new THREE.Vector2(6,48),new THREE.Vector2(0,48)
+  ].map(p=>p.clone().multiplyScalar(size/48));
+  const geo = new THREE.LatheGeometry(pts, 20);
+  const mat = new THREE.MeshStandardMaterial({color, emissive:accent, emissiveIntensity:0.3, roughness:0.5, metalness:0.3});
+  return new THREE.Mesh(geo, mat);
+}
+function buildSubRealmMesh(spec){
+  switch(spec.shape){
+    case 'rock': return buildJaggedRock(spec.size, spec.primary);
+    case 'lush': return buildLushIsland(spec.size, spec.primary, spec.accent);
+    case 'ruins': return buildRuinsPlatform(spec.size, spec.primary, spec.accent);
+    case 'fortress': return buildFortress(spec.size, spec.primary, spec.accent);
+    case 'crystal': return buildCrystalCluster(spec.size, spec.primary, spec.accent);
+    case 'creature': return buildCreatureBlob(spec.size, spec.primary, spec.accent);
+    case 'serpent': return buildSerpent(spec.size, spec.primary, spec.accent);
+    case 'towers': return buildTowerCluster(spec.size, spec.primary, spec.accent);
+    case 'chalice': return buildChalice(spec.size, spec.primary, spec.accent);
+    default: return buildJaggedRock(spec.size, spec.primary);
+  }
+}
+
+/* ---------------- planet decor & veil helpers ----------------
+   Chaque royaume principal reçoit un accessoire signature bâti avec les mêmes
+   fonctions procédurales que les marqueurs de sous-royaumes (cristaux, tours,
+   créatures...) afin que toute la composition reste visuellement "raccord". */
+const PLANET_DECOR = {
+  earth:      {shape:'lush',     count:4, scale:0.16, orbitR:1.28, spin:0.12},
+  highUmbra:  {shape:'crystal',  count:3, scale:0.22, orbitR:1.30, spin:0.18},
+  underworld: {shape:'creature', count:2, scale:0.36, orbitR:1.20, spin:0.08},
+  mercury:    {shape:'crystal',  count:3, scale:0.22, orbitR:1.30, spin:0.22},
+  saturn:     {shape:'ring'},
+  neptune:    {shape:'crystal',  count:4, scale:0.16, orbitR:1.25, spin:0.16},
+  uranus:     {shape:'towers',   count:1, scale:0.55, orbitR:0,    spin:0.05},
+  pluto:      {shape:'creature', count:1, scale:0.42, orbitR:1.10, spin:0.10},
+  moon:       {shape:'rock',     count:5, scale:0.11, orbitR:1.40, spin:0.14},
+  venus:      {shape:'lush',     count:3, scale:0.26, orbitR:1.20, spin:0.10},
+  jupiter:    {shape:'fortress', count:1, scale:0.50, orbitR:0,    spin:0.04},
+  mars:       {shape:'rock',     count:4, scale:0.18, orbitR:1.30, spin:0.20},
+  horizon:    {shape:'towers',   count:1, scale:0.60, orbitR:0,    spin:0.05},
+};
+function addPlanetDecor(group, r, size){
+  const cfg = PLANET_DECOR[r.id];
+  if(!cfg) return null;
+  if(cfg.shape === 'ring'){
+    const ringGeo = new THREE.TorusGeometry(size*1.9, size*0.22, 10, 64);
+    const ringMat = new THREE.MeshStandardMaterial({color:r.accent, roughness:0.5, metalness:0.4, transparent:true, opacity:0.75, flatShading:true});
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = Math.PI/2.4;
+    group.add(ring);
+    return {pivot:ring, spin:0.03};
+  }
+  const pivot = new THREE.Group();
+  const n = cfg.count;
+  for(let i=0;i<n;i++){
+    const item = buildSubRealmMesh({shape:cfg.shape, size:size*cfg.scale, primary:r.primary, accent:r.accent});
+    if(cfg.orbitR > 0){
+      const ang = (i/n)*Math.PI*2 + Math.random()*0.4;
+      const rad = size*cfg.orbitR;
+      item.position.set(Math.cos(ang)*rad, (Math.random()-0.5)*size*0.3, Math.sin(ang)*rad);
+    } else {
+      item.position.set(0, size*0.55, 0);
+    }
+    pivot.add(item);
+  }
+  group.add(pivot);
+  return {pivot, spin:cfg.spin};
+}
+function buildVeiledWisp(pos, size){
+  const tex = makeGlowTexture(0x445048);
+  const mat = new THREE.SpriteMaterial({map:tex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.28, fog:false});
+  const sp = new THREE.Sprite(mat);
+  sp.position.copy(pos);
+  sp.scale.set(size*1.8, size*1.8, 1);
+  sp.visible = false;
+  return sp;
+}
+function overshoot(p){
+  const c = 1.7;
+  const x = p-1;
+  return 1 + (c+1)*x*x*x + c*x*x;
+}
+
+/* realm objects */
+const realmGroup = new THREE.Group();
+scene.add(realmGroup);
+const realmObjects = {}; // id -> {mesh, glow, label, data, basePos}
+
+REALMS.forEach((r, idx)=>{
+  const group = new THREE.Group();
+  let pos;
+  if(r.isCenter){
+    pos = new THREE.Vector3(0,0,0);
+  } else if(r.axis === "up"){
+    pos = new THREE.Vector3(0, 360, 0);
+  } else if(r.axis === "down"){
+    pos = new THREE.Vector3(0, -340, 0);
+  } else {
+    const rad = 430;
+    const ang = (r.ring / RING_COUNT) * Math.PI * 2;
+    pos = new THREE.Vector3(Math.cos(ang)*rad, Math.sin(r.ring*1.3)*36, Math.sin(ang)*rad);
+  }
+  group.position.copy(pos);
+
+  const size = r.isCenter ? 46 : (r.axis ? 40 : 30);
+
+  let sphereGeo, flatShaded = true;
+  if(r.id === "highUmbra"){
+    const pts = [];
+    pts.push(new THREE.Vector2(0, -40));
+    pts.push(new THREE.Vector2(4, -40));
+    pts.push(new THREE.Vector2(5, -10));
+    pts.push(new THREE.Vector2(3, 0));
+    pts.push(new THREE.Vector2(3, 6));
+    pts.push(new THREE.Vector2(16, 14));
+    pts.push(new THREE.Vector2(24, 30));
+    pts.push(new THREE.Vector2(20, 44));
+    pts.push(new THREE.Vector2(6, 48));
+    pts.push(new THREE.Vector2(0, 48));
+    sphereGeo = new THREE.LatheGeometry(pts, 32);
+    flatShaded = false;
+  } else {
+    sphereGeo = jitterGeometry(new THREE.SphereGeometry(size, 24, 20), 0.06);
+  }
+  const sphereMat = new THREE.MeshStandardMaterial({
+    color: r.primary, emissive: r.accent, emissiveIntensity: 0.35,
+    roughness: 0.55, metalness: 0.25, flatShading: flatShaded
+  });
+  const mesh = new THREE.Mesh(sphereGeo, sphereMat);
+  mesh.userData.realmId = r.id;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+
+  const haloGeo = new THREE.TorusGeometry(size*1.45, size*0.045, 8, 80);
+  const haloMat = new THREE.MeshBasicMaterial({color:r.accent, transparent:true, opacity:0.45, blending:THREE.AdditiveBlending, depthWrite:false, fog:false});
+  const halo = new THREE.Mesh(haloGeo, haloMat);
+  halo.rotation.x = Math.PI/2.15 + (r.isCenter||r.axis ? 0.25 : 0);
+  group.add(halo);
+
+  const glowTex = makeGlowTexture(r.accent);
+  const glowMat = new THREE.SpriteMaterial({map:glowTex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.9});
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(size*4.2, size*4.2, 1);
+  group.add(glow);
+
+  const labelTex = makeTextTexture(r.glyph, "#e9dfc4");
+  const labelMat = new THREE.SpriteMaterial({map:labelTex, transparent:true, depthWrite:false});
+  const label = new THREE.Sprite(labelMat);
+  label.scale.set(size*1.6, size*1.6, 1);
+  label.position.set(0, size*1.9, 0);
+  group.add(label);
+
+  const decor = addPlanetDecor(group, r, size);
+  const wisp = buildVeiledWisp(pos, size);
+  scene.add(wisp);
+
+  realmGroup.add(group);
+  realmObjects[r.id] = {group, mesh, glow, label, halo, decor, wisp, data:r, basePos:pos.clone(), phase:idx, size, hoverT:0, unlockAnim:null};
+});
+
+/* ---------------- sub-realm markers ----------------
+   Stand-ins procéduraux pour l'ensemble des royaumes listés dans
+   Prompts_IA_Atlas_Umbra.md (vagues 2, 3a, 3b, 3c, 3d). À remplacer par les
+   .glb Meshy/Rodin une fois l'export débloqué côté compte. */
+const SUBREALMS = [];
+(function buildSubRealmData(){
+  const hautUmbraAnchor = new THREE.Vector3(0,360,0);
+  const hautTiers = [
+    {id:"nearDreaming", name:"Near Dreaming", subtitle:"Premier palier du Haut-Umbra — fragment d'île onirique", shape:"rock", primary:0x6fbdb8, accent:0xdff4ef, size:16},
+    {id:"farDreaming", name:"Far Dreaming", subtitle:"Second palier — vaste plateforme astrale", shape:"lush", primary:0x2f7a76, accent:0xd9c27a, size:22},
+    {id:"deepDreamingHero", name:"Deep Dreaming ⭐", subtitle:"Palier le plus profond — calice astral ornemental", shape:"chalice", primary:0x1f6b63, accent:0xf0d98a, size:20},
+  ];
+  hautTiers.forEach((t,i)=>{
+    const ang = (i/hautTiers.length)*Math.PI*2;
+    const r = 110;
+    SUBREALMS.push(Object.assign({}, t, {category:"Palier du Haut-Umbra", requires:"highUmbra",
+      pos:new THREE.Vector3(hautUmbraAnchor.x+Math.cos(ang)*r, hautUmbraAnchor.y+(i-1)*30, hautUmbraAnchor.z+Math.sin(ang)*r)}));
+  });
+
+  const underworldAnchor = new THREE.Vector3(0,-340,0);
+  const darkUmbra = [
+    {id:"tempest", name:"Tempest", subtitle:"Royaume sombre — tempête perpétuelle", shape:"rock", primary:0x2a2a35, accent:0x9fc9ff, size:22},
+    {id:"labyrinthe", name:"Labyrinthe", subtitle:"Royaume sombre — ruines labyrinthiques", shape:"ruins", primary:0x4a4a42, accent:0x7bbf7b, size:22},
+    {id:"stygie", name:"Royaume de Fer (Stygie)", subtitle:"Royaume sombre — forteresse de fer gothique", shape:"fortress", primary:0x2e2e2e, accent:0x8a8a8a, size:24},
+    {id:"jade", name:"Royaume de Jade", subtitle:"Royaume sombre — architecture de jade", shape:"fortress", primary:0x1f5c47, accent:0x6fe3b8, size:22},
+    {id:"obsidienne", name:"Royaume d'Obsidienne", subtitle:"Royaume sombre — verre volcanique noir", shape:"crystal", primary:0x0d0d10, accent:0x6a4fa0, size:22},
+    {id:"ivoire", name:"Royaume d'Ivoire", subtitle:"Royaume sombre — architecture d'ivoire", shape:"ruins", primary:0xd8cdb0, accent:0xf5efe0, size:22},
+    {id:"argile", name:"Royaume d'Argile", subtitle:"Royaume sombre — ruines d'argile craquelée", shape:"rock", primary:0x8a6a4a, accent:0xc9a878, size:22},
+    {id:"paradoxe", name:"Royaume du Paradoxe", subtitle:"Royaume sombre — géométries impossibles et logique brisée", shape:"crystal", primary:0x2c1a4a, accent:0xb87fe0, size:24},
+  ];
+  darkUmbra.forEach((t,i)=>{
+    const ang = (i/darkUmbra.length)*Math.PI*2;
+    const r = 160;
+    SUBREALMS.push(Object.assign({}, t, {category:"Oblivion — Royaumes Sombres", requires:"underworld",
+      pos:new THREE.Vector3(underworldAnchor.x+Math.cos(ang)*r, underworldAnchor.y+Math.sin(i*1.4)*30, underworldAnchor.z+Math.sin(ang)*r)}));
+  });
+
+  const nearMinor = [
+    {id:"erebus", name:"Erebus", subtitle:"Royaume mineur — roc assombri par les ombres", shape:"rock", primary:0x1c1c22, accent:0x555566, size:24},
+    {id:"legendaire", name:"Royaume Légendaire", subtitle:"Royaume mineur — ruines mythiques envahies de lianes", shape:"ruins", primary:0x4a4a3a, accent:0x8fe07a, size:24},
+    {id:"ete", name:"Pays d'Été", subtitle:"Royaume mineur — prairie dorée éternelle", shape:"lush", primary:0x7a8a2c, accent:0xf0d888, size:24},
+    {id:"wolfshome", name:"Wolfshome", subtitle:"Royaume mineur — forêt sauvage et tanière rocheuse", shape:"lush", primary:0x2c4a2c, accent:0x9ab98a, size:24},
+    {id:"pangaea", name:"Pangaea", subtitle:"Royaume mineur — jungle primordiale intacte", shape:"lush", primary:0x1f4a2a, accent:0x6fae6f, size:24},
+    {id:"flux", name:"Flux Realm", subtitle:"Royaume mineur — terrain instable et failles énergétiques", shape:"rock", primary:0x3a2a4a, accent:0xb87fe0, size:24},
+    {id:"battleground", name:"Battleground", subtitle:"Royaume mineur — champ de bataille cicatrisé", shape:"ruins", primary:0x5a3a3a, accent:0xd67a6a, size:24},
+    {id:"abyss", name:"The Abyss", subtitle:"Royaume mineur — gouffre béant aux fissures lumineuses", shape:"rock", primary:0x141414, accent:0xff5a3a, size:24},
+    {id:"atrocity", name:"Atrocity Realm", subtitle:"Royaume mineur — terre tordue par la violence", shape:"creature", primary:0x2a1414, accent:0xd6304a, size:22},
+    {id:"aetherial", name:"Aetherial Realm", subtitle:"Royaume mineur — flèches cristallines éthérées", shape:"crystal", primary:0x2c5a7a, accent:0x8fd6ff, size:24},
+    {id:"scar", name:"Scar", subtitle:"Royaume mineur — île fracturée par une plaie d'énergie", shape:"rock", primary:0x3a2c2c, accent:0xff8a4a, size:24},
+    {id:"cyberrealm", name:"CyberRealm", subtitle:"Zone technocratique — tours de données cristallines", shape:"towers", primary:0x1c2a3a, accent:0x4fd6ff, size:26},
+    {id:"autochthonia", name:"Autochthonia ⭐", subtitle:"Zone technocratique — forteresse-monde industrielle", shape:"fortress", primary:0x3a3a3a, accent:0xe08a3a, size:32},
+  ];
+  nearMinor.forEach((t,i)=>{
+    const ang = (i/nearMinor.length)*Math.PI*2 + 0.3;
+    const r = 620;
+    SUBREALMS.push(Object.assign({}, t, {category: (t.name==="CyberRealm"||t.name.indexOf("Autochthonia")===0) ? "Zone technocratique" : "Royaume mineur du Near Umbra", requires:"__SELF__",
+      pos:new THREE.Vector3(Math.cos(ang)*r, Math.sin(i*1.1)*50, Math.sin(ang)*r)}));
+  });
+
+  const deepEntities = [
+    {id:"malfeas", name:"Malfeas ⭐", subtitle:"Entité du Deep Umbra — forteresse-créature colossale", shape:"creature", primary:0x2a0a0a, accent:0xd6304a, size:40, angle:95},
+    {id:"beastofwar", name:"Beast-of-War", subtitle:"Entité du Deep Umbra — bête de guerre blindée", shape:"creature", primary:0x3a1a1a, accent:0xc95a3a, size:30, angle:150},
+    {id:"defilerwyrm", name:"Defiler Wyrm", subtitle:"Entité du Deep Umbra — dragon serpentin corrompu", shape:"serpent", primary:0x2a3a1a, accent:0x8a5ac9, size:30, angle:320},
+    {id:"eaterofsouls", name:"Eater-of-Souls", subtitle:"Entité du Deep Umbra — spectre dévoreur d'âmes", shape:"creature", primary:0x0a0a0f, accent:0xe8e8f0, size:26, angle:15},
+  ];
+  deepEntities.forEach(t=>{
+    const ang = t.angle*Math.PI/180;
+    const r = 860;
+    SUBREALMS.push(Object.assign({}, t, {category:"Entité du Deep Umbra", requires:"__ALL__",
+      pos:new THREE.Vector3(Math.cos(ang)*r, 80+Math.random()*60, Math.sin(ang)*r)}));
+  });
+})();
+
+SUBREALMS.forEach((spec, idx)=>{
+  const group = new THREE.Group();
+  group.position.copy(spec.pos);
+
+  const meshObj = buildSubRealmMesh(spec);
+  let primaryMesh = meshObj.isMesh ? meshObj : null;
+  meshObj.traverse(o=>{ if(o.isMesh){ o.userData.realmId = spec.id; o.castShadow = true; o.receiveShadow = true; if(!primaryMesh) primaryMesh = o; } });
+  group.add(meshObj);
+
+  const glowTex = makeGlowTexture(spec.accent);
+  const glowMat = new THREE.SpriteMaterial({map:glowTex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.45});
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.set(spec.size*3.4, spec.size*3.4, 1);
+  group.add(glow);
+
+  const label = makeLabelSprite(spec.name, "#"+new THREE.Color(spec.accent).getHexString(), Math.max(120, spec.name.length*7));
+  label.position.set(0, spec.size*1.35, 0);
+  group.add(label);
+
+  let wisp = null;
+  if(spec.requires === "__SELF__"){
+    wisp = buildVeiledWisp(spec.pos, spec.size);
+    scene.add(wisp);
+  }
+
+  realmGroup.add(group);
+  realmObjects[spec.id] = {
+    group, mesh:primaryMesh, glow, label, halo:null, wisp,
+    requires: spec.requires,
+    data:{
+      id:spec.id, name:spec.name, subtitle:spec.subtitle, category:spec.category,
+      isCenter:false, subSize:spec.size, forceUnlocked:true, statusLabel:spec.category,
+      customNote:"Marqueur généré proceduralement en attendant l'asset .glb IA (voir Prompts_IA_Atlas_Umbra.md) — "+spec.category+"."
+    },
+    basePos:spec.pos.clone(), phase: idx*0.37 + 2, size:spec.size, hoverT:0, unlockAnim:null
+  };
+});
+
+/* traveling particles along ley lines */
+const travelers = [];
+
+/* outer boundary of the Deep Umbra — original composition, own assets */
+function makeLabelSprite(text, color, size){
+  const c = document.createElement('canvas'); c.width=512; c.height=96;
+  const ctx = c.getContext('2d');
+  ctx.font = "italic 40px 'EB Garamond', serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.shadowColor="rgba(0,0,0,0.9)"; ctx.shadowBlur=10;
+  ctx.fillStyle = color;
+  ctx.fillText(text, 256, 48);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({map:tex, transparent:true, depthWrite:false});
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set(size, size*0.19, 1);
+  return sp;
+}
+
+const boundaryRadius = 780;
+const boundaryGeo = new THREE.RingGeometry(boundaryRadius-1, boundaryRadius+1, 96);
+const boundaryMat = new THREE.MeshBasicMaterial({color:0xc9a227, transparent:true, opacity:0.18, side:THREE.DoubleSide});
+const boundaryRing = new THREE.Mesh(boundaryGeo, boundaryMat);
+boundaryRing.rotation.x = Math.PI/2;
+scene.add(boundaryRing);
+
+const BOUNDARY_ZONES = [
+  { label:"Wyld — Shenti de Dynamisme",  angle:200, color:0x6fdbb0, tint:"#a8f0d8" },
+  { label:"Weaver — Shenti de Stase",    angle:-20, color:0x9fb8c9, tint:"#c9dbe6" },
+  { label:"Wyrm — Shenti d'Entropie",    angle:230, color:0x8a2e2e, tint:"#e0a0a0" },
+];
+BOUNDARY_ZONES.forEach(z=>{
+  const ang = z.angle * Math.PI/180;
+  const x = Math.cos(ang)*boundaryRadius, zPos = Math.sin(ang)*boundaryRadius;
+  const glowTex = makeGlowTexture(z.color);
+  const glowMat = new THREE.SpriteMaterial({map:glowTex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.5});
+  const glow = new THREE.Sprite(glowMat);
+  glow.position.set(x, 40, zPos);
+  glow.scale.set(340,340,1);
+  scene.add(glow);
+
+  const label = makeLabelSprite(z.label, z.tint, 260);
+  label.position.set(x, 130, zPos);
+  scene.add(label);
+});
+
+/* --- far background nebula clouds --- */
+const nebulaSprites = [];
+const NEBULA_COLORS = [0x2f8f7a, 0xc9a227, 0x6b4a8b, 0xa03a2a, 0x3a6ea5, 0x2f8f7a];
+NEBULA_COLORS.forEach((col, i)=>{
+  const ang = (i/NEBULA_COLORS.length)*Math.PI*2 + 0.4;
+  const r = 1600 + Math.random()*500;
+  const y = -200 + Math.random()*700;
+  const tex = makeGlowTexture(col);
+  const mat = new THREE.SpriteMaterial({map:tex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, opacity:0.16, fog:false});
+  const sp = new THREE.Sprite(mat);
+  sp.position.set(Math.cos(ang)*r, y, Math.sin(ang)*r);
+  sp.scale.set(1400+Math.random()*600, 1400+Math.random()*600, 1);
+  scene.add(sp);
+  nebulaSprites.push({sprite:sp, phase:Math.random()*10});
+});
+
+/* --- twinkling accent stars --- */
+const twinkleStars = [];
+for(let i=0;i<26;i++){
+  const r = 700+Math.random()*1400;
+  const theta = Math.random()*Math.PI*2;
+  const phi = Math.acos(2*Math.random()-1);
+  const tex = makeGlowTexture(0xdfe8e2);
+  const mat = new THREE.SpriteMaterial({map:tex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, fog:false});
+  const sp = new THREE.Sprite(mat);
+  sp.position.set(r*Math.sin(phi)*Math.cos(theta), r*Math.cos(phi), r*Math.sin(phi)*Math.sin(theta));
+  const base = 8+Math.random()*10;
+  sp.scale.set(base, base, 1);
+  scene.add(sp);
+  twinkleStars.push({sprite:sp, base, phase:Math.random()*10, speed:0.6+Math.random()*1.2});
+}
+
+/* --- flowing aurora ribbons over the boundary zones --- */
+function makeAuroraTexture(hexColor){
+  const c = document.createElement('canvas'); c.width=256; c.height=128;
+  const ctx = c.getContext('2d');
+  const col = new THREE.Color(hexColor);
+  const r255=Math.floor(col.r*255), g255=Math.floor(col.g*255), b255=Math.floor(col.b*255);
+  for(let x=0;x<256;x++){
+    const a = (Math.sin(x*0.09)*0.5+0.5) * (Math.sin(x*0.021+2)*0.5+0.5);
+    ctx.fillStyle = `rgba(${r255},${g255},${b255},${(a*0.5).toFixed(3)})`;
+    ctx.fillRect(x,0,1,128);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.set(2,1);
+  return tex;
+}
+const auroraRibbons = [];
+
+/* --- occasional shooting stars --- */
+const shootingStars = [];
+let nextShootAt = 2 + Math.random()*4;
+function spawnShootingStar(){
+  const r = 1600;
+  const a1 = Math.random()*Math.PI*2, a2 = a1 + (Math.random()*0.6+0.3);
+  const from = new THREE.Vector3(Math.cos(a1)*r, 400+Math.random()*500, Math.sin(a1)*r);
+  const to = new THREE.Vector3(Math.cos(a2)*r*0.6, 100+Math.random()*200, Math.sin(a2)*r*0.6);
+  const tex = makeGlowTexture(0xf3ecd0);
+  const mat = new THREE.SpriteMaterial({map:tex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, fog:false});
+  const sp = new THREE.Sprite(mat);
+  sp.scale.set(18,18,1);
+  scene.add(sp);
+  shootingStars.push({sprite:sp, from, to, start:elapsedTime, duration:1.4+Math.random()*0.8});
+}
+
+/* ---------------- camera controls (custom orbit) ---------------- */
+let camDist = 1350, camTheta = 0.5, camPhi = 1.15;
+let camTarget = new THREE.Vector3(0,0,0);
+let desiredTarget = new THREE.Vector3(0,0,0);
+let desiredDist = 1350;
+let isDragging = false, lastX=0, lastY=0, downX=0, downY=0;
+
+function updateCameraPosition(){
+  camera.position.x = camTarget.x + camDist*Math.sin(camPhi)*Math.sin(camTheta);
+  camera.position.y = camTarget.y + camDist*Math.cos(camPhi);
+  camera.position.z = camTarget.z + camDist*Math.sin(camPhi)*Math.cos(camTheta);
+  camera.lookAt(camTarget);
+}
+
+/* multi-touch tracking: 1 finger = look/pick (same as mouse drag), 2 fingers = pinch-to-zoom */
+const activePointers = new Map();
+let pinchStartDist = null, pinchStartCamDist = null;
+
+renderer.domElement.addEventListener('pointerdown', (e)=>{
+  activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(activePointers.size === 1){
+    isDragging = true; lastX=e.clientX; lastY=e.clientY; downX=e.clientX; downY=e.clientY;
+  } else if(activePointers.size === 2){
+    isDragging = false;
+    const pts = [...activePointers.values()];
+    pinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    pinchStartCamDist = camDist;
+  }
+});
+window.addEventListener('pointermove', (e)=>{
+  if(activePointers.has(e.pointerId)) activePointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+  if(activePointers.size >= 2 && pinchStartDist){
+    const pts = [...activePointers.values()];
+    const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    camDist = Math.max(150, Math.min(2600, pinchStartCamDist * (pinchStartDist/dist)));
+    desiredDist = camDist;
+    return;
+  }
+  if(isDragging){
+    const dx = e.clientX-lastX, dy = e.clientY-lastY;
+    camTheta -= dx*0.006;
+    camPhi -= dy*0.006;
+    camPhi = Math.max(0.35, Math.min(Math.PI-0.35, camPhi));
+    lastX=e.clientX; lastY=e.clientY;
+    return;
+  }
+  updateHover(e.clientX, e.clientY);
+});
+window.addEventListener('pointerleave', ()=>{ currentHoverId = null; renderer.domElement.style.cursor = "default"; });
+function releasePointer(e){
+  activePointers.delete(e.pointerId);
+  if(activePointers.size < 2) pinchStartDist = null;
+  if(activePointers.size === 0){
+    if(!isDragging) return;
+    isDragging = false;
+    const moved = Math.hypot(e.clientX-downX, e.clientY-downY);
+    if(moved < 6) handlePick(e.clientX, e.clientY);
+  }
+}
+window.addEventListener('pointerup', releasePointer);
+window.addEventListener('pointercancel', releasePointer);
+renderer.domElement.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  camDist += e.deltaY * 0.4;
+  camDist = Math.max(150, Math.min(2600, camDist));
+  desiredDist = camDist;
+}, {passive:false});
+
+/* free-flight keyboard movement */
+const pressedKeys = new Set();
+window.addEventListener('keydown', (e)=>{
+  pressedKeys.add(e.code);
+  if(["Space","ArrowUp","ArrowDown"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', (e)=> pressedKeys.delete(e.code));
+window.addEventListener('blur', ()=> pressedKeys.clear());
+
+/* virtual joystick (touch devices) */
+let joyVector = {x:0, y:0}; // x: strafe (-1..1), y: forward/back (-1..1, negative = forward)
+(function setupTouchJoystick(){
+  const isTouch = ('ontouchstart' in window) || window.matchMedia('(pointer: coarse)').matches;
+  if(!isTouch) return;
+  document.getElementById('touchJoystick').style.display = 'block';
+  document.getElementById('touchUpDown').style.display = 'flex';
+
+  const base = document.getElementById('joystickBase');
+  const knob = document.getElementById('joystickKnob');
+  let joyId = null, centerX = 0, centerY = 0;
+  const maxR = 42;
+
+  function updateKnob(clientX, clientY){
+    const dx = clientX-centerX, dy = clientY-centerY;
+    const dist = Math.min(maxR, Math.hypot(dx,dy));
+    const ang = Math.atan2(dy,dx);
+    const kx = Math.cos(ang)*dist, ky = Math.sin(ang)*dist;
+    knob.style.transform = `translate(calc(-50% + ${kx}px), calc(-50% + ${ky}px))`;
+    joyVector = {x: kx/maxR, y: ky/maxR};
+  }
+  base.addEventListener('pointerdown', (e)=>{
+    joyId = e.pointerId;
+    const rect = base.getBoundingClientRect();
+    centerX = rect.left+rect.width/2; centerY = rect.top+rect.height/2;
+    base.setPointerCapture(e.pointerId);
+    updateKnob(e.clientX, e.clientY);
+  });
+  base.addEventListener('pointermove', (e)=>{ if(e.pointerId === joyId) updateKnob(e.clientX, e.clientY); });
+  function releaseJoy(e){
+    if(e.pointerId !== joyId) return;
+    joyId = null; joyVector = {x:0,y:0};
+    knob.style.transform = 'translate(-50%,-50%)';
+  }
+  base.addEventListener('pointerup', releaseJoy);
+  base.addEventListener('pointercancel', releaseJoy);
+
+  let vertHeld = null; // 'up' | 'down' | null
+  document.getElementById('btnTouchUp').addEventListener('pointerdown', ()=> vertHeld='up');
+  document.getElementById('btnTouchDown').addEventListener('pointerdown', ()=> vertHeld='down');
+  window.addEventListener('pointerup', ()=>{ vertHeld=null; });
+  window.addEventListener('pointercancel', ()=>{ vertHeld=null; });
+  window.__touchVertical = ()=>vertHeld;
+})();
+
+function applyFlightMovement(dt){
+  const vertHeld = window.__touchVertical ? window.__touchVertical() : null;
+  const anyInput = pressedKeys.size > 0 || Math.abs(joyVector.x)>0.05 || Math.abs(joyVector.y)>0.05 || vertHeld;
+  if(!anyInput) return;
+
+  const forward = new THREE.Vector3().subVectors(camTarget, camera.position);
+  forward.y = 0; forward.normalize();
+  if(forward.lengthSq() === 0) forward.set(0,0,-1);
+  const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0,1,0)).normalize();
+
+  const speed = (pressedKeys.has("ShiftLeft")||pressedKeys.has("ShiftRight") ? 900 : 480) * dt;
+  const move = new THREE.Vector3();
+
+  if(pressedKeys.has("KeyW")||pressedKeys.has("ArrowUp")) move.add(forward);
+  if(pressedKeys.has("KeyS")||pressedKeys.has("ArrowDown")) move.sub(forward);
+  if(pressedKeys.has("KeyD")||pressedKeys.has("ArrowRight")) move.add(right);
+  if(pressedKeys.has("KeyA")||pressedKeys.has("ArrowLeft")) move.sub(right);
+  if(pressedKeys.has("Space")) move.y += 1;
+  if((pressedKeys.has("ShiftLeft")||pressedKeys.has("ShiftRight")) && move.lengthSq()===0) move.y -= 1;
+
+  if(Math.abs(joyVector.y) > 0.05) move.add(forward.clone().multiplyScalar(-joyVector.y));
+  if(Math.abs(joyVector.x) > 0.05) move.add(right.clone().multiplyScalar(joyVector.x));
+  if(vertHeld === 'up') move.y += 1;
+  if(vertHeld === 'down') move.y -= 1;
+
+  if(move.lengthSq() > 0){
+    move.normalize().multiplyScalar(speed);
+    camTarget.add(move);
+    desiredTarget.copy(camTarget);
+  }
+}
+
+/* picking & hover */
+const raycaster = new THREE.Raycaster();
+const mouseNDC = new THREE.Vector2();
+let currentHoverId = null;
+
+function pickableMeshes(){
+  const meshes = [];
+  realmGroup.traverse(o=>{
+    if(!o.isMesh || o.userData.realmId === undefined) return;
+    let g = o; while(g.parent && g.parent !== realmGroup) g = g.parent;
+    if(g.visible) meshes.push(o);
+  });
+  return meshes;
+}
+function pickAt(clientX, clientY){
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouseNDC.x = ((clientX-rect.left)/rect.width)*2-1;
+  mouseNDC.y = -((clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouseNDC, camera);
+  const hits = raycaster.intersectObjects(pickableMeshes());
+  if(!hits.length) return null;
+  let obj = hits[0].object;
+  while(obj && obj.userData.realmId === undefined) obj = obj.parent;
+  return obj ? obj.userData.realmId : null;
+}
+function handlePick(clientX, clientY){
+  const id = pickAt(clientX, clientY);
+  if(id) selectRealm(id);
+}
+function updateHover(clientX, clientY){
+  const id = pickAt(clientX, clientY);
+  currentHoverId = id;
+  renderer.domElement.style.cursor = id ? "pointer" : "default";
+}
+
+function selectRealm(id){
+  const obj = realmObjects[id];
+  const isUnlocked = obj.data.forceUnlocked || unlocked.includes(id);
+  desiredTarget = obj.basePos.clone();
+  desiredDist = obj.data.isCenter ? 260 : (obj.data.subSize ? Math.max(90, obj.data.subSize*4) : 200);
+  showInfo(obj.data, isUnlocked);
+  if(!isUnlocked) toast("Royaume verrouillé — demande le code à ton Conteur.");
+}
+
+/* realms with at least one 2D map available (mirrors REALM_ZONES in atlas_map_2d.html) —
+   a realm can have zero, one or several maps; the map file itself decides whether to
+   jump straight to the single map or show a picker when there are several. */
+const MAP_LINKS = { earth: true };
+
+function showInfo(r, isUnlocked){
+  document.getElementById("infoPanel").classList.add("show");
+  document.getElementById("infoName").textContent = r.name;
+  document.getElementById("infoSub").textContent = r.subtitle;
+  const st = document.getElementById("infoStatus");
+  if(r.forceUnlocked){
+    st.textContent = r.statusLabel || "Marqueur";
+    st.className = "status unlocked";
+  } else {
+    st.textContent = isUnlocked ? "Débloqué" : "Verrouillé";
+    st.className = "status " + (isUnlocked?"unlocked":"locked");
+  }
+  document.getElementById("infoNote").textContent = r.customNote || (isUnlocked
+    ? "La vue détaillée de ce royaume (carte, points d'intérêt) sera accessible depuis ici dans la prochaine étape."
+    : "Ce royaume reste voilé tant qu'il n'est pas déverrouillé par un code.");
+
+  const mapBtn = document.getElementById("infoMapBtn");
+  const hasMap = isUnlocked && MAP_LINKS[r.id];
+  if(hasMap){
+    mapBtn.style.display = "block";
+    mapBtn.onclick = ()=>{ location.href = "atlas_map_2d.html?realm="+encodeURIComponent(r.id); };
+  } else {
+    mapBtn.style.display = "none";
+    mapBtn.onclick = null;
+  }
+}
+document.getElementById("infoClose").addEventListener("click", ()=>{
+  document.getElementById("infoPanel").classList.remove("show");
+  desiredTarget = new THREE.Vector3(0,0,0);
+  desiredDist = 1350;
+});
+
+/* ---------------- side drawer: list of discovered realms ---------------- */
+document.getElementById("btnDrawer").addEventListener("click", ()=>{
+  document.getElementById("realmDrawer").classList.toggle("show");
+});
+document.getElementById("drawerClose").addEventListener("click", ()=>{
+  document.getElementById("realmDrawer").classList.remove("show");
+});
+
+let realmSearchQuery = "";
+document.getElementById("realmSearch").addEventListener("input", (e)=>{
+  realmSearchQuery = e.target.value.trim().toLowerCase();
+  renderRealmList();
+});
+
+function renderRealmList(){
+  const listEl = document.getElementById("realmList");
+  const subEl = document.getElementById("realmDrawerSub");
+  const badgeEl = document.getElementById("realmCountBadge");
+  listEl.innerHTML = "";
+
+  const groups = [];
+  function addToGroup(catName, item){
+    let g = groups.find(g=>g.name===catName);
+    if(!g){ g = {name:catName, items:[]}; groups.push(g); }
+    g.items.push(item);
+  }
+
+  REALMS.forEach(r=>{
+    if(!unlocked.includes(r.id)) return;
+    const cat = r.isCenter ? "Origine" : (r.axis ? "Royaumes Astraux" : "Sphères Planétaires");
+    addToGroup(cat, {id:r.id, name:r.name, glyph:r.glyph, accent:r.accent});
+  });
+  Object.values(realmObjects).forEach(o=>{
+    if(o.requires === undefined || !o.group.visible) return;
+    addToGroup(o.data.category, {id:o.data.id, name:o.data.name, glyph:"✦", accent:0xe9dfc4});
+  });
+
+  const total = REALMS.length + SUBREALMS.length;
+  const count = REALMS.filter(r=>unlocked.includes(r.id)).length +
+    Object.values(realmObjects).filter(o=>o.requires!==undefined && o.group.visible).length;
+  subEl.textContent = count+" / "+total+" découverts";
+  badgeEl.textContent = count+"/"+total;
+
+  if(count===0){
+    listEl.innerHTML = '<div class="realm-drawer-empty">Aucun royaume découvert pour l’instant — entre un code pour commencer ton voyage.</div>';
+    return;
+  }
+
+  const filteredGroups = realmSearchQuery
+    ? groups.map(g=>({name:g.name, items:g.items.filter(it=> it.name.toLowerCase().includes(realmSearchQuery))})).filter(g=>g.items.length)
+    : groups;
+
+  if(filteredGroups.length===0){
+    listEl.innerHTML = '<div class="realm-drawer-empty">Aucun résultat pour “'+escapeRealmSearch(realmSearchQuery)+'”.</div>';
+    return;
+  }
+
+  filteredGroups.forEach(g=>{
+    const h = document.createElement("div");
+    h.className = "realm-drawer-cat";
+    h.textContent = g.name;
+    listEl.appendChild(h);
+    g.items.forEach(item=>{
+      const el = document.createElement("div");
+      el.className = "realm-drawer-item";
+      el.style.setProperty("--accent", "#"+new THREE.Color(item.accent).getHexString());
+      const glyphSpan = document.createElement("span");
+      glyphSpan.className = "glyph"; glyphSpan.textContent = item.glyph;
+      const namesSpan = document.createElement("span");
+      namesSpan.className = "names";
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "name"; nameSpan.textContent = item.name;
+      namesSpan.appendChild(nameSpan);
+      el.appendChild(glyphSpan); el.appendChild(namesSpan);
+      el.addEventListener("click", ()=>{ selectRealm(item.id); });
+      listEl.appendChild(el);
+    });
+  });
+}
+
+/* code redemption */
+async function redeemCode(){
+  if(!auth.currentUser){ toast("Connecte-toi d'abord."); return; }
+  const input = document.getElementById("codeInput");
+  const code = input.value.trim().toUpperCase();
+  if(!code) return;
+  const target = CODES[code];
+  if(!target){ toast("Code invalide."); return; }
+  if(target==="ALL"){
+    const selfGatedIds = Object.values(realmObjects).filter(o=>o.requires==="__SELF__").map(o=>o.data.id);
+    unlocked = REALMS.map(r=>r.id).concat(selfGatedIds);
+  }
+  else if(!unlocked.includes(target)){ unlocked.push(target); }
+  else { toast("Déjà déverrouillé."); input.value=""; return; }
+  await pushUnlocked();
+  toast(target==="ALL" ? "Tous les royaumes sont déverrouillés." : "Royaume déverrouillé !");
+  input.value="";
+  refreshUnlockVisuals();
+  if(target !== "ALL" && realmObjects[target]){
+    const obj = realmObjects[target];
+    desiredTarget = obj.basePos.clone();
+    desiredDist = obj.data.isCenter ? 260 : Math.max(140, (obj.size||30)*5);
+  }
+}
+document.getElementById("btnCode").addEventListener("click", redeemCode);
+document.getElementById("codeInput").addEventListener("keydown", e=>{ if(e.key==="Enter") redeemCode(); });
+
+/* only unlocked realms (and sub-realms whose parent realm is unlocked) are shown;
+   newly unlocked ones play a reveal animation with a light burst */
+let prevUnlockedIds = new Set();
+
+function isSubUnlocked(requires, id){
+  if(requires === "__ALL__") return REALMS.every(r=>unlocked.includes(r.id));
+  if(requires === "__SELF__") return unlocked.includes(id);
+  return unlocked.includes(requires);
+}
+
+function refreshUnlockVisuals(skipAnim){
+  const newlyUnlocked = [];
+  const nowUnlockedIds = new Set();
+
+  REALMS.forEach(r=>{
+    const obj = realmObjects[r.id];
+    const isUnlocked = unlocked.includes(r.id);
+    if(isUnlocked){
+      nowUnlockedIds.add(r.id);
+      if(!prevUnlockedIds.has(r.id)) newlyUnlocked.push(obj);
+    }
+    obj.group.visible = isUnlocked;
+    obj.wisp.visible = !isUnlocked;
+  });
+
+  Object.values(realmObjects).forEach(obj=>{
+    if(obj.requires === undefined) return;
+    const isUnlocked = isSubUnlocked(obj.requires, obj.data.id);
+    if(isUnlocked){
+      nowUnlockedIds.add(obj.data.id);
+      if(!prevUnlockedIds.has(obj.data.id)) newlyUnlocked.push(obj);
+    }
+    obj.group.visible = isUnlocked;
+    if(obj.wisp) obj.wisp.visible = !isUnlocked;
+  });
+
+  prevUnlockedIds = nowUnlockedIds;
+
+  newlyUnlocked.forEach(obj=>{
+    if(skipAnim) obj.group.scale.set(1,1,1);
+    else playUnlockAnimation(obj);
+  });
+
+  renderRealmList();
+}
+
+function playUnlockAnimation(obj){
+  obj.unlockAnim = {start: elapsedTime, duration: 1.2};
+  obj.group.scale.set(0.001, 0.001, 0.001);
+  spawnUnlockBurst(obj);
+}
+function spawnUnlockBurst(obj){
+  const n = 14;
+  for(let i=0;i<n;i++){
+    const tex = makeGlowTexture(0xf3e6a8);
+    const mat = new THREE.SpriteMaterial({map:tex, blending:THREE.AdditiveBlending, depthWrite:false, transparent:true, fog:false});
+    const sp = new THREE.Sprite(mat);
+    sp.scale.set(14,14,1);
+    scene.add(sp);
+    const ang = Math.random()*Math.PI*2, elev = (Math.random()-0.5)*Math.PI*0.6;
+    const dist = (obj.size||30) * (2.2+Math.random()*1.6);
+    const dir = new THREE.Vector3(Math.cos(ang)*Math.cos(elev), Math.sin(elev), Math.sin(ang)*Math.cos(elev)).multiplyScalar(dist);
+    shootingStars.push({
+      sprite: sp,
+      from: obj.basePos.clone(),
+      to: obj.basePos.clone().add(dir),
+      start: elapsedTime, duration: 0.9+Math.random()*0.6
+    });
+  }
+}
+
+/* resize */
+window.addEventListener('resize', ()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* ---------------- animation loop ---------------- */
+const clock = new THREE.Clock();
+let elapsedTime = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+  elapsedTime += dt;
+  const t = elapsedTime;
+
+  applyFlightMovement(dt);
+  camDist += (desiredDist-camDist)*0.07;
+  camTarget.lerp(desiredTarget, 0.15);
+  updateCameraPosition();
+
+  Object.values(realmObjects).forEach(o=>{
+    o.group.rotation.y = t*0.05*(o.data.isCenter?1:0.4) + o.phase;
+    const sz = o.size || o.data.subSize || (o.data.isCenter?46:(o.data.axis?40:30));
+    o.label.position.y = sz*(o.data.subSize?1.35:1.9) + Math.sin(t*0.8+o.phase)*3;
+
+    if(o.halo){
+      o.halo.material.opacity = 0.4 + 0.2*Math.sin(t*1.4+o.phase);
+      o.halo.rotation.z += dt*0.15;
+    }
+    if(o.decor && o.decor.pivot){
+      o.decor.pivot.rotation.y += dt*o.decor.spin;
+    }
+    if(o.wisp && o.wisp.visible){
+      const k = 0.7+0.3*Math.sin(t*0.5+o.phase);
+      o.wisp.material.opacity = 0.22*k;
+      o.wisp.scale.set(o.size*1.8*(0.9+0.1*k), o.size*1.8*(0.9+0.1*k), 1);
+    }
+
+    const hoverTarget = (currentHoverId === o.data.id) ? 1 : 0;
+    o.hoverT += (hoverTarget - o.hoverT) * Math.min(1, dt*6);
+    const hoverScale = 1 + o.hoverT*0.12;
+
+    let animScale = 1;
+    if(o.unlockAnim){
+      const p = Math.min(1, (t - o.unlockAnim.start)/o.unlockAnim.duration);
+      animScale = overshoot(p);
+      if(p >= 1) o.unlockAnim = null;
+    }
+    o.group.scale.setScalar(hoverScale * animScale);
+  });
+
+  travelers.forEach(tr=>{
+    const p = (t*tr.speed + tr.offset) % 1;
+    tr.sprite.position.lerpVectors(tr.from, tr.to, p);
+  });
+
+  nebulaSprites.forEach(n=>{
+    n.sprite.material.opacity = 0.12 + Math.sin(t*0.15+n.phase)*0.05;
+  });
+
+  twinkleStars.forEach(s=>{
+    const k = 0.55 + 0.45*Math.sin(t*s.speed + s.phase);
+    s.sprite.scale.set(s.base*k, s.base*k, 1);
+    s.sprite.material.opacity = 0.4 + 0.6*k;
+  });
+
+  auroraRibbons.forEach(a=>{
+    a.tex.offset.x = (a.tex.offset.x + a.speed*dt) % 1;
+    a.spiral.rotation.z += dt*0.15;
+  });
+
+  nextShootAt -= dt;
+  if(nextShootAt <= 0){
+    spawnShootingStar();
+    nextShootAt = 3 + Math.random()*5;
+  }
+  for(let i=shootingStars.length-1;i>=0;i--){
+    const s = shootingStars[i];
+    const p = (t - s.start) / s.duration;
+    if(p >= 1){
+      scene.remove(s.sprite);
+      shootingStars.splice(i,1);
+      continue;
+    }
+    s.sprite.position.lerpVectors(s.from, s.to, p);
+    s.sprite.material.opacity = Math.sin(p*Math.PI);
+  }
+
+  renderer.render(scene, camera);
+}
+
+/* ---------------- init ----------------
+   unlocked realms are now loaded/synced via the Firestore subscription
+   (see subscribeUnlocked, wired to onAuthStateChanged above). */
+(function init(){
+  refreshUnlockVisuals(true);
+  updateCameraPosition();
+  animate();
+})();
+</script>
+</body>
+</html>

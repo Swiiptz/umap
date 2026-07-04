@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Carte 2D — Atlas de l'Umbra</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Mono&display=swap');
+
+*{box-sizing:border-box;}
+html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-family:'EB Garamond',serif; color:#e9dfc4;}
+
+.topbar{
+  position:fixed; top:0; left:0; right:0; z-index:20;
+  display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between;
+  padding:14px 20px; background:linear-gradient(180deg, rgba(5,12,10,0.9), rgba(5,12,10,0));
+}
+.topbar .left{ display:flex; align-items:center; gap:14px; }
+.topbar h1{font-family:'Cinzel',serif; font-size:20px; margin:0; letter-spacing:1px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8);}
+.topbar .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.hint-text{ font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; }
+
+.btn{
+  font-family:'EB Garamond',serif; font-size:14px; cursor:pointer;
+  background: linear-gradient(180deg,#ddc677,#c9a227); color:#0d1815; border:1px solid #c9a227; border-radius:6px;
+  padding:8px 14px; font-weight:600;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover{ filter:brightness(1.08); box-shadow:0 2px 14px rgba(201,162,39,0.35); transform:translateY(-1px); }
+.btn:active{ transform:translateY(0); filter:brightness(0.96); }
+.btn.ghost{ background:rgba(15,30,25,0.85); color:#e9dfc4; border:1px solid #3a544b; font-weight:400;}
+.btn.ghost:hover{ box-shadow:0 2px 14px rgba(123,191,154,0.18); border-color:#5a7a6b; }
+.btn.active{ outline:2px solid #c9a227; }
+.btn.small{ padding:6px 10px; font-size:12.5px; }
+.btn.danger{ background:linear-gradient(180deg,#d6704f,#a83a20); border-color:#a83a20; color:#1a0d08; }
+.btn.icon-only{ padding:8px 10px; }
+
+select, .tag-filter{
+  background:rgba(15,30,25,0.85); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:8px 10px; font-family:'EB Garamond',serif; font-size:13px;
+}
+
+.user-badge{
+  display:flex; align-items:center; gap:8px; font-size:12px; color:#b7ad8e;
+  font-family:'Space Mono',monospace; background:rgba(15,30,25,0.85); border:1px solid #3a544b;
+  border-radius:6px; padding:7px 10px;
+}
+.user-badge button{
+  background:none; border:none; color:#ddc677; cursor:pointer; font-family:'EB Garamond',serif;
+  font-size:12px; padding:0; text-decoration:underline;
+}
+
+/* ---- highlighter toolbar ---- */
+.highlight-toolbar{
+  position:fixed; top:70px; left:50%; transform:translateX(-50%); z-index:18;
+  display:flex; align-items:center; gap:10px; padding:10px 16px; border-radius:10px;
+  background:linear-gradient(180deg, rgba(19,36,32,0.97), rgba(13,24,21,0.98));
+  border:1px solid #c9a227; box-shadow:0 12px 30px rgba(0,0,0,0.5); flex-wrap:wrap; justify-content:center;
+}
+.hl-label{ font-size:11px; font-family:'Space Mono',monospace; color:#8a9a91; }
+.hl-colors, .hl-sizes{ display:flex; gap:6px; align-items:center; }
+.hl-colors button{
+  width:24px; height:24px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); cursor:pointer;
+}
+.hl-colors button.sel{ border-color:#e9dfc4; box-shadow:0 0 0 2px #c9a227; }
+.hl-sizes button{
+  width:30px; height:30px; border-radius:8px; border:1px solid #3a544b; background:rgba(5,12,10,0.5); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.hl-sizes button.sel{ border-color:#c9a227; background:rgba(201,162,39,0.2); }
+.hl-sizes button span{ border-radius:50%; background:#e9dfc4; display:block; }
+.highlight-svg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.highlight-svg path{ pointer-events:none; }
+.highlight-svg.erase-mode path{ pointer-events:stroke; cursor:not-allowed; }
+.map-wrap.highlighting{ cursor:crosshair; }
+
+/* ---- zone hub (choose among several maps for the same realm) ---- */
+.zone-hub{ position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:#0c1512; }
+.zone-hub.show{ display:flex; }
+.zone-hub-inner{ text-align:center; max-width:900px; padding:20px; }
+.zone-hub-inner h2{ font-family:'Cinzel',serif; color:#ddc677; font-size:24px; margin:0 0 6px; }
+.zone-hub-inner .sub{ color:#b7ad8e; font-style:italic; margin-bottom:26px; }
+.zone-grid{ display:flex; flex-wrap:wrap; gap:16px; justify-content:center; }
+.zone-card{
+  width:220px; background:linear-gradient(180deg, rgba(19,36,32,0.92), rgba(13,24,21,0.94));
+  border:1px solid #3a544b; border-radius:12px; padding:20px 16px; cursor:pointer;
+  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.zone-card:hover{ transform:translateY(-3px); border-color:#c9a227; box-shadow:0 10px 30px rgba(201,162,39,0.2); }
+.zone-card .icon{ font-size:34px; margin-bottom:8px; }
+.zone-card h3{ font-family:'Cinzel',serif; font-size:16px; color:#ddc677; margin:0 0 4px; }
+.zone-card p{ font-size:12.5px; color:#b7ad8e; font-style:italic; margin:0; }
+.zone-empty{ color:#8a9a91; font-style:italic; }
+
+/* ---- map area ---- */
+.map-outer{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#0c1512; }
+.map-wrap{
+  position:relative; width:min(1300px, 96vw); height:min(910px, 84vh);
+  box-shadow:0 30px 80px rgba(0,0,0,0.6); border-radius:6px; overflow:hidden;
+  cursor:crosshair; background:#0c1512; touch-action:none;
+}
+.map-wrap.browsing{ cursor:grab; }
+.map-wrap.panning{ cursor:grabbing; }
+
+.map-canvas{
+  position:absolute; top:0; left:0; width:1000px; height:700px; transform-origin:0 0;
+}
+.map-canvas svg{ display:block; width:100%; height:100%; }
+
+.pin-layer{ position:absolute; inset:0; pointer-events:none; }
+.pin-marker{
+  position:absolute; transform:translate(-50%,-100%); pointer-events:auto; cursor:grab;
+  touch-action:none;
+}
+.pin-visual{
+  display:flex; flex-direction:column; align-items:center; filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6));
+  transform-origin:50% 100%;
+}
+.pin-marker:hover .dot{ transform:rotate(-45deg) scale(1.15); }
+.pin-marker.dragging{ cursor:grabbing; z-index:30; }
+.pin-marker .dot{
+  width:30px; height:30px; border-radius:50% 50% 50% 0; transform:rotate(-45deg);
+  display:flex; align-items:center; justify-content:center; border:2px solid rgba(0,0,0,0.35);
+  transition: transform .15s ease;
+}
+.pin-marker .dot span{ transform:rotate(45deg); font-size:14px; }
+.pin-marker .tag-label{
+  margin-top:2px; font-size:10px; font-family:'Space Mono',monospace; color:#f3ecd6;
+  background:rgba(5,12,10,0.75); padding:1px 6px; border-radius:8px; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ---- description panel (left dock) ---- */
+.desc-panel{
+  position:fixed; left:0; top:0; bottom:0; z-index:15; width:300px; max-width:85vw;
+  background:linear-gradient(180deg, rgba(13,24,21,0.97), rgba(9,17,15,0.98));
+  border-right:1px solid #3a544b; box-shadow:12px 0 40px rgba(0,0,0,0.5);
+  transform:translateX(-100%); transition: transform .4s cubic-bezier(.22,.9,.28,1);
+  display:flex; flex-direction:column; padding-top:120px;
+}
+.desc-panel.show{ transform:translateX(0); }
+.desc-panel h3{ font-family:'Cinzel',serif; font-size:15px; color:#ddc677; margin:0 18px 8px; letter-spacing:0.5px; }
+.desc-panel textarea{
+  flex:1; margin:0 18px 12px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4;
+  border-radius:8px; padding:12px; font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; resize:none;
+}
+.desc-panel textarea:focus{ outline:none; border-color:#c9a227; }
+.desc-panel .meta{ margin:0 18px 16px; font-size:10.5px; color:#7a8f83; font-family:'Space Mono',monospace; }
+
+.panel-head-row{ display:flex; align-items:center; justify-content:space-between; margin:0 18px 8px; }
+.panel-head-row h3{ margin:0; }
+
+.md-content{
+  flex:1; margin:0 18px 12px; padding:12px; overflow-y:auto;
+  background:rgba(5,12,10,0.6); border:1px solid #3a544b; border-radius:8px;
+  font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; color:#e9dfc4;
+}
+.md-content:empty::before{ content:"Rien à afficher pour l'instant."; color:#7a8f83; font-style:italic; }
+.md-content h1, .md-content h2, .md-content h3{ font-family:'Cinzel',serif; color:#ddc677; margin:0 0 8px; }
+.md-content h1{ font-size:18px; } .md-content h2{ font-size:16px; } .md-content h3{ font-size:14px; }
+.md-content p{ margin:0 0 10px; }
+.md-content ul, .md-content ol{ margin:0 0 10px; padding-left:22px; }
+.md-content li{ margin-bottom:3px; }
+.md-content strong{ color:#f0e6c8; }
+.md-content em{ color:#cabf9e; }
+.md-content a{ color:#8fd6ff; }
+.md-content code{ background:rgba(0,0,0,0.35); padding:1px 5px; border-radius:4px; font-family:'Space Mono',monospace; font-size:12.5px; }
+.md-content blockquote{ margin:0 0 10px; padding-left:10px; border-left:2px solid #3a544b; color:#b7ad8e; font-style:italic; }
+.md-content > *:last-child{ margin-bottom:0; }
+
+.pin-popup .notes.md-content{ margin:6px 0; padding:8px; font-size:12.5px; max-height:180px; }
+
+/* ---- personal notes drawer (right dock) ---- */
+.notes-drawer{
+  position:fixed; right:0; top:0; bottom:0; z-index:15; width:300px; max-width:85vw;
+  background:linear-gradient(180deg, rgba(24,19,13,0.97), rgba(16,12,9,0.98));
+  border-left:1px solid #5a4a2f; box-shadow:-12px 0 40px rgba(0,0,0,0.5);
+  transform:translateX(100%); transition: transform .4s cubic-bezier(.22,.9,.28,1);
+  display:flex; flex-direction:column; padding-top:120px;
+}
+.notes-drawer.show{ transform:translateX(0); }
+.notes-drawer .head{ display:flex; align-items:center; justify-content:space-between; margin:0 18px 8px; }
+.notes-drawer h3{ font-family:'Cinzel',serif; font-size:15px; color:#e8c07a; margin:0; letter-spacing:0.5px; }
+.notes-drawer .close{ cursor:pointer; color:#b7ad8e; font-size:16px; }
+.notes-drawer .sub{ margin:0 18px 10px; font-size:11px; color:#a99a7a; font-style:italic; }
+.notes-drawer textarea{
+  flex:1; margin:0 18px 12px; background:rgba(5,12,10,0.6); border:1px solid #5a4a2f; color:#e9dfc4;
+  border-radius:8px; padding:12px; font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; resize:none;
+}
+.notes-drawer textarea:focus{ outline:none; border-color:#e8c07a; }
+.notes-drawer input{
+  margin:0 18px 16px; background:rgba(5,12,10,0.6); border:1px solid #5a4a2f; color:#e9dfc4;
+  border-radius:8px; padding:9px 12px; font-family:'Space Mono',monospace; font-size:12px; width:calc(100% - 36px);
+}
+
+/* ---- pin modal ---- */
+.pin-modal-backdrop{
+  position:fixed; inset:0; z-index:40; background:rgba(0,0,0,0.55);
+  display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity .25s ease;
+}
+.pin-modal-backdrop.show{ opacity:1; pointer-events:auto; }
+.pin-modal{
+  width:360px; max-width:90vw; background:linear-gradient(180deg, rgba(19,36,32,0.98), rgba(13,24,21,0.99));
+  border:1px solid #c9a227; border-radius:12px; padding:20px 22px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  max-height:88vh; overflow-y:auto;
+}
+.pin-modal h3{ font-family:'Cinzel',serif; color:#ddc677; margin:0 0 14px; font-size:17px; }
+.pin-modal label{ display:block; font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; margin:10px 0 4px; text-transform:uppercase; letter-spacing:0.5px; }
+.pin-modal input[type=text], .pin-modal textarea{
+  width:100%; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:8px 10px; font-family:'EB Garamond',serif; font-size:14px;
+}
+.pin-modal textarea{ resize:vertical; min-height:60px; }
+.pin-modal input[type=text]:focus, .pin-modal textarea:focus{ outline:none; border-color:#c9a227; }
+.icon-row, .color-row{ display:flex; gap:6px; flex-wrap:wrap; }
+.icon-row button{
+  width:34px; height:34px; border-radius:8px; border:1px solid #3a544b; background:rgba(5,12,10,0.5);
+  cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center;
+}
+.icon-row button.sel{ border-color:#c9a227; background:rgba(201,162,39,0.2); }
+.color-row button{
+  width:26px; height:26px; border-radius:50%; border:2px solid rgba(255,255,255,0.15); cursor:pointer;
+}
+.color-row button.sel{ border-color:#e9dfc4; box-shadow:0 0 0 2px #c9a227; }
+.pin-modal-actions{ display:flex; gap:8px; margin-top:16px; justify-content:flex-end; }
+
+/* ---- pin popup (view existing pin) ---- */
+.pin-popup{
+  position:absolute; z-index:25; transform:translate(-50%, -100%); pointer-events:none;
+}
+.pin-popup-inner{
+  width:240px; transform-origin:50% 100%; margin-top:-42px; pointer-events:auto;
+  background:linear-gradient(180deg, rgba(19,36,32,0.97), rgba(13,24,21,0.98));
+  border:1px solid #c9a227; border-radius:10px; padding:12px 14px; box-shadow:0 12px 30px rgba(0,0,0,0.55);
+}
+.pin-popup h4{ margin:0 0 4px; font-family:'Cinzel',serif; font-size:14.5px; color:#ddc677; display:flex; align-items:center; gap:6px; }
+.pin-popup .tags{ margin:4px 0; display:flex; flex-wrap:wrap; gap:4px; }
+.pin-popup .tags span{ font-size:10px; font-family:'Space Mono',monospace; background:rgba(201,162,39,0.15); border:1px solid rgba(201,162,39,0.35); border-radius:10px; padding:1px 7px; color:#e8d488; }
+.pin-popup .notes{ font-size:12.5px; color:#cabf9e; line-height:1.4; margin:6px 0; white-space:pre-wrap; }
+.pin-popup .meta{ font-size:10px; color:#7a8f83; font-family:'Space Mono',monospace; margin-bottom:8px; }
+.pin-popup .row{ display:flex; gap:6px; }
+.pin-popup .close{ position:absolute; top:6px; right:9px; cursor:pointer; color:#b7ad8e; font-size:14px; }
+
+/* ---- loading screen (covers the auth flash while Firebase resolves the session) ---- */
+.loading-screen{
+  position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  transition:opacity .35s ease;
+}
+.loading-screen.hide{ opacity:0; pointer-events:none; }
+.loading-inner{ text-align:center; }
+.loading-glyph{
+  font-size:42px; color:#ddc677; display:inline-block;
+  animation: loading-pulse 1.6s ease-in-out infinite;
+  text-shadow:0 0 20px rgba(221,198,119,0.5);
+}
+.loading-text{ margin-top:14px; font-family:'Space Mono',monospace; font-size:12px; color:#8a9a91; letter-spacing:1px; }
+@keyframes loading-pulse{
+  0%,100%{ transform:scale(1) rotate(0deg); opacity:0.6; }
+  50%{ transform:scale(1.18) rotate(180deg); opacity:1; }
+}
+
+/* ---- auth gate (shared pattern with 3D scene) ---- */
+.auth-gate{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  opacity:1; transition:opacity .4s ease; pointer-events:auto;
+}
+.auth-gate.hide{ opacity:0; pointer-events:none; }
+.auth-card{
+  width:340px; max-width:calc(100vw - 40px); padding:28px 26px;
+  background:linear-gradient(180deg, rgba(19,36,32,0.95), rgba(13,24,21,0.97));
+  border:1px solid #c9a227; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  text-align:center;
+}
+.auth-card h1{ font-family:'Cinzel',serif; font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
+.auth-card .auth-sub{ font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:20px; }
+.auth-card input{
+  width:100%; background:rgba(5,12,10,0.7); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:10px 12px; font-family:'EB Garamond',serif; font-size:14px; margin-bottom:10px;
+}
+.auth-card input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
+.auth-card .btn{ width:100%; margin-top:4px; }
+.auth-card .auth-error{ min-height:18px; font-size:12.5px; color:#e08a7a; margin-top:10px; }
+
+.toast{
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#132420; border:1px solid #c9a227; color:#ddc677; padding:10px 18px;
+  border-radius:8px; font-size:14px; opacity:0; transition:all .3s ease; z-index:60; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <button class="btn ghost" id="btnBack">← Atlas</button>
+    <h1 id="zoneTitle">Carte</h1>
+  </div>
+  <div class="tools">
+    <span class="hint-text" id="zoomHint">Molette : zoom · glisser : déplacer</span>
+    <button class="btn ghost icon-only" id="btnResetView" title="Réinitialiser la vue">⤾</button>
+    <button class="btn ghost" id="btnToggleDesc">📜 Description</button>
+    <button class="btn ghost" id="btnAddPin">+ Ajouter un point</button>
+    <button class="btn ghost" id="btnHighlight">🖍️ Surligneur</button>
+    <select id="tagFilter"><option value="">Tous les tags</option></select>
+    <button class="btn ghost" id="btnNotes">🔒 Mes notes</button>
+    <div class="user-badge" id="userBadge" style="display:none;">
+      <span id="userEmail"></span><button id="btnLogout">se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="highlight-toolbar" id="highlightToolbar" style="display:none;">
+  <span class="hl-label">Couleur</span>
+  <div class="hl-colors" id="hlColors"></div>
+  <span class="hl-label">Épaisseur</span>
+  <div class="hl-sizes" id="hlSizes"></div>
+  <button class="btn ghost small" id="hlClearMine">Effacer mes traits</button>
+  <button class="btn small" id="hlDone">Terminer</button>
+</div>
+
+<div class="zone-hub" id="zoneHub">
+  <div class="zone-hub-inner">
+    <h2 id="hubTitle">Choisis une carte</h2>
+    <div class="sub" id="hubSub">Plusieurs lieux sont disponibles pour ce royaume.</div>
+    <div class="zone-grid" id="zoneGrid"></div>
+  </div>
+</div>
+
+<div class="map-outer" id="mapOuter">
+  <div class="map-wrap" id="mapWrap">
+    <div class="map-canvas" id="mapCanvas">
+      <svg id="mapSvg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet"></svg>
+      <svg id="highlightSvg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet" class="highlight-svg"></svg>
+      <div class="pin-layer" id="pinLayer"></div>
+    </div>
+  </div>
+</div>
+
+<div class="desc-panel" id="descPanel">
+  <div class="panel-head-row">
+    <h3>Description de la zone</h3>
+    <button class="btn ghost small" id="descPreviewToggle">Aperçu</button>
+  </div>
+  <textarea id="descText" placeholder="Décris ce lieu pour le groupe — quartiers, ambiance, dangers, secrets connus... (Markdown supporté)"></textarea>
+  <div class="md-content" id="descPreviewBox" style="display:none;"></div>
+  <div class="meta">Visible et modifiable par tout le groupe · Markdown supporté · sauvegarde automatique</div>
+</div>
+
+<div class="notes-drawer" id="notesDrawer">
+  <div class="head"><h3>Mes notes privées</h3><span class="close" id="notesClose">✕</span></div>
+  <div class="sub">Invisibles pour les autres joueurs</div>
+  <div class="panel-head-row" style="margin:0 18px 6px;">
+    <span></span>
+    <button class="btn ghost small" id="notesPreviewToggle">Aperçu</button>
+  </div>
+  <textarea id="notesText" placeholder="Tes théories, indices personnels, choses à ne pas oublier... (Markdown supporté)"></textarea>
+  <div class="md-content" id="notesPreviewBox" style="display:none;"></div>
+  <input type="text" id="notesTags" placeholder="tags perso, séparés par des virgules">
+</div>
+
+<div class="pin-modal-backdrop" id="pinModalBackdrop">
+  <div class="pin-modal">
+    <h3 id="pinModalTitle">Nouveau point d'intérêt</h3>
+    <label>Nom</label>
+    <input type="text" id="pinName" placeholder="Ex: Auberge du Chaudron Fêlé">
+    <label>Icône</label>
+    <div class="icon-row" id="iconRow"></div>
+    <label>Couleur</label>
+    <div class="color-row" id="colorRow"></div>
+    <label>Tags (séparés par des virgules)</label>
+    <input type="text" id="pinTags" placeholder="taverne, indice, danger...">
+    <label>Notes</label>
+    <textarea id="pinNotes" placeholder="Détails partagés avec le groupe... (Markdown supporté)"></textarea>
+    <div class="pin-modal-actions">
+      <button class="btn danger small" id="pinDeleteBtn" style="display:none;">Supprimer</button>
+      <button class="btn ghost small" id="pinCancelBtn">Annuler</button>
+      <button class="btn small" id="pinSaveBtn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-inner">
+    <div class="loading-glyph">⊕</div>
+    <div class="loading-text">Chargement de l'Atlas…</div>
+  </div>
+</div>
+
+<div class="auth-gate hide" id="authGate">
+  <div class="auth-card">
+    <h1>Atlas de l'Umbra</h1>
+    <div class="auth-sub">Connexion requise pour accéder à la carte</div>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn" id="btnLogin">Se connecter</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- registry: which realms have which 2D maps ----------------
+   A realm can have zero, one or several maps (§4 CDC: "sous-cartes de zone").
+   Add entries here as new cities/locations get built. */
+const REALM_ZONES = {
+  earth: [
+    { key:"edinburgh", label:"Édimbourg", subtitle:"Ville de départ des PJs", icon:"🏰", builder:"edinburgh" }
+  ]
+};
+
+/* ---------------- routing: hub (pick a map) vs. a specific map ---------------- */
+const params = new URLSearchParams(location.search);
+const parentRealm = params.get("realm");
+const zoneParam = params.get("zone");
+let FIRESTORE_KEY, ZONE_LABEL, MAP_BUILDER;
+
+function goToZone(realmId, zone){
+  location.href = "atlas_map_2d.html?realm="+encodeURIComponent(realmId)+"&zone="+encodeURIComponent(zone.key)+"&label="+encodeURIComponent(zone.label);
+}
+
+function showHub(realmId){
+  const zones = REALM_ZONES[realmId] || [];
+  document.getElementById("mapOuter").style.display = "none";
+  document.getElementById("topbarTools") && null;
+  const hub = document.getElementById("zoneHub");
+  hub.classList.add("show");
+  document.getElementById("hubTitle").textContent = zones.length ? "Choisis une carte" : "Pas encore de carte ici";
+  document.getElementById("hubSub").textContent = zones.length
+    ? "Plusieurs lieux sont disponibles pour ce royaume."
+    : "Reviens plus tard — cette zone n'a pas encore de carte détaillée.";
+  const grid = document.getElementById("zoneGrid");
+  if(!zones.length){
+    grid.innerHTML = '<div class="zone-empty">Aucune carte enregistrée pour ce royaume pour l\'instant.</div>';
+    return;
+  }
+  grid.innerHTML = "";
+  zones.forEach(z=>{
+    const card = document.createElement("div");
+    card.className = "zone-card";
+    card.innerHTML = `<div class="icon">${z.icon||"🗺️"}</div><h3>${z.label}</h3><p>${z.subtitle||""}</p>`;
+    card.addEventListener("click", ()=> goToZone(realmId, z));
+    grid.appendChild(card);
+  });
+}
+
+(function resolveRoute(){
+  if(zoneParam){
+    // a specific map was requested directly
+    const parentZones = parentRealm ? (REALM_ZONES[parentRealm]||[]) : [];
+    const match = parentZones.find(z=>z.key===zoneParam);
+    FIRESTORE_KEY = zoneParam;
+    ZONE_LABEL = params.get("label") || (match ? match.label : zoneParam);
+    MAP_BUILDER = match ? match.builder : zoneParam;
+    return;
+  }
+  if(parentRealm){
+    const zones = REALM_ZONES[parentRealm] || [];
+    if(zones.length === 1){
+      goToZone(parentRealm, zones[0]);
+      return;
+    }
+    showHub(parentRealm);
+    FIRESTORE_KEY = null;
+    return;
+  }
+  // no params at all (direct file open) — fall back to the one map that exists today
+  FIRESTORE_KEY = "edinburgh"; ZONE_LABEL = "Édimbourg"; MAP_BUILDER = "edinburgh";
+})();
+
+if(FIRESTORE_KEY){
+  document.title = ZONE_LABEL + " — Atlas de l'Umbra";
+  document.getElementById("zoneTitle").textContent = ZONE_LABEL;
+}
+
+document.getElementById("btnBack").addEventListener("click", ()=>{ location.href = "atlas_umbra_3d_prototype.html"; });
+
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ---------------- markdown rendering (sanitized) ---------------- */
+function renderMarkdown(text){
+  if(!text) return "";
+  const rawHtml = marked.parse(text, { breaks:true });
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#)/i });
+}
+function escapeHtml(text){
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+
+/* ---------------- Firebase ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyCsN-mEZWfxzkNckNDYackhn2cYu-VSFXQ",
+  authDomain: "umap-50aa5.firebaseapp.com",
+  projectId: "umap-50aa5",
+  storageBucket: "umap-50aa5.firebasestorage.app",
+  messagingSenderId: "1081078775679",
+  appId: "1:1081078775679:web:aeac0b5d98de5b7b7e244a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+let pinsRef = null, descRef = null, strokesRef = null;
+if(FIRESTORE_KEY){
+  const realmRef = db.collection("realms").doc(FIRESTORE_KEY);
+  pinsRef = realmRef.collection("pins");
+  descRef = realmRef.collection("info").doc("description");
+  strokesRef = realmRef.collection("strokes");
+}
+
+let pinsUnsub = null, descUnsub = null, notesUnsub = null, strokesUnsub = null;
+let pins = {};
+let descSavedRemotely = "";
+let descFocused = false;
+let notesFocused = false;
+
+async function doLogin(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Renseigne l'email et le mot de passe."; return; }
+  try{ await auth.signInWithEmailAndPassword(email, password); }
+  catch(e){ errEl.textContent = "Connexion refusée — vérifie l'email et le mot de passe."; }
+}
+document.getElementById("btnLogin").addEventListener("click", doLogin);
+document.getElementById("authEmail").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("authPassword").focus(); });
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+document.getElementById("btnLogout").addEventListener("click", ()=> auth.signOut());
+
+auth.onAuthStateChanged(user=>{
+  document.getElementById("loadingScreen").classList.add("hide");
+  const gate = document.getElementById("authGate");
+  const badge = document.getElementById("userBadge");
+  if(user){
+    gate.classList.add("hide");
+    badge.style.display = "flex";
+    document.getElementById("userEmail").textContent = user.email;
+    document.getElementById("authError").textContent = "";
+    document.getElementById("authPassword").value = "";
+    if(FIRESTORE_KEY) subscribeAll(user);
+  } else {
+    gate.classList.remove("hide");
+    badge.style.display = "none";
+    if(pinsUnsub){ pinsUnsub(); pinsUnsub = null; }
+    if(descUnsub){ descUnsub(); descUnsub = null; }
+    if(notesUnsub){ notesUnsub(); notesUnsub = null; }
+    if(strokesUnsub){ strokesUnsub(); strokesUnsub = null; }
+    pins = {}; renderPins();
+    strokes = {}; renderStrokes();
+  }
+});
+
+function subscribeAll(user){
+  if(!pinsUnsub){
+    pinsUnsub = pinsRef.onSnapshot(snap=>{
+      pins = {};
+      snap.forEach(doc=>{ pins[doc.id] = Object.assign({id:doc.id}, doc.data()); });
+      renderPins();
+      renderTagFilter();
+    }, err=>{ console.error(err); toast("Erreur de synchronisation des points."); });
+  }
+  if(!descUnsub){
+    descUnsub = descRef.onSnapshot(snap=>{
+      const data = snap.data();
+      const text = data && data.text ? data.text : "";
+      descSavedRemotely = text;
+      if(!descFocused) document.getElementById("descText").value = text;
+      refreshDescPreview();
+    }, err=>{ console.error(err); });
+  }
+  if(!notesUnsub){
+    const notesRef = db.collection("users").doc(user.uid).collection("notes").doc(FIRESTORE_KEY);
+    notesUnsub = notesRef.onSnapshot(snap=>{
+      const data = snap.data();
+      const text = data && data.text ? data.text : "";
+      const tags = data && data.tags ? data.tags.join(", ") : "";
+      if(!notesFocused){
+        document.getElementById("notesText").value = text;
+        document.getElementById("notesTags").value = tags;
+      }
+      refreshNotesPreview();
+    }, err=>{ console.error(err); });
+    window.__notesRef = notesRef;
+  }
+  if(!strokesUnsub){
+    strokesUnsub = strokesRef.onSnapshot(snap=>{
+      strokes = {};
+      snap.forEach(doc=>{ strokes[doc.id] = Object.assign({id:doc.id}, doc.data()); });
+      renderStrokes();
+    }, err=>{ console.error(err); toast("Erreur de synchronisation des surlignages."); });
+  }
+}
+
+/* ---------------- description: shared, autosave ---------------- */
+const descText = document.getElementById("descText");
+descText.addEventListener("focus", ()=> descFocused = true);
+descText.addEventListener("blur", ()=>{ descFocused = false; saveDescription(); });
+let descTimer = null;
+descText.addEventListener("input", ()=>{
+  clearTimeout(descTimer);
+  descTimer = setTimeout(saveDescription, 900);
+});
+async function saveDescription(){
+  if(!descRef) return;
+  const val = descText.value;
+  if(val === descSavedRemotely) return;
+  try{ await descRef.set({ text: val, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); descSavedRemotely = val; }
+  catch(e){ console.error(e); toast("Échec de sauvegarde de la description."); }
+}
+
+document.getElementById("btnToggleDesc").addEventListener("click", ()=>{
+  document.getElementById("descPanel").classList.toggle("show");
+});
+
+let descPreviewMode = false;
+function refreshDescPreview(){
+  if(descPreviewMode) document.getElementById("descPreviewBox").innerHTML = renderMarkdown(descText.value);
+}
+document.getElementById("descPreviewToggle").addEventListener("click", (e)=>{
+  descPreviewMode = !descPreviewMode;
+  e.target.textContent = descPreviewMode ? "Modifier" : "Aperçu";
+  descText.style.display = descPreviewMode ? "none" : "block";
+  document.getElementById("descPreviewBox").style.display = descPreviewMode ? "block" : "none";
+  if(descPreviewMode) refreshDescPreview();
+});
+
+/* ---------------- personal notes: private, autosave ---------------- */
+const notesText = document.getElementById("notesText");
+const notesTags = document.getElementById("notesTags");
+[notesText, notesTags].forEach(el=>{
+  el.addEventListener("focus", ()=> notesFocused = true);
+  el.addEventListener("blur", ()=>{ notesFocused = false; saveNotes(); });
+});
+let notesTimer = null;
+[notesText, notesTags].forEach(el=> el.addEventListener("input", ()=>{
+  clearTimeout(notesTimer);
+  notesTimer = setTimeout(saveNotes, 900);
+}));
+async function saveNotes(){
+  if(!window.__notesRef) return;
+  const text = notesText.value;
+  const tags = notesTags.value.split(",").map(s=>s.trim()).filter(Boolean);
+  try{ await window.__notesRef.set({ text, tags, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }); }
+  catch(e){ console.error(e); toast("Échec de sauvegarde des notes."); }
+}
+
+document.getElementById("btnNotes").addEventListener("click", ()=>{
+  document.getElementById("notesDrawer").classList.toggle("show");
+});
+document.getElementById("notesClose").addEventListener("click", ()=>{
+  document.getElementById("notesDrawer").classList.remove("show");
+});
+
+let notesPreviewMode = false;
+function refreshNotesPreview(){
+  if(notesPreviewMode) document.getElementById("notesPreviewBox").innerHTML = renderMarkdown(notesText.value);
+}
+document.getElementById("notesPreviewToggle").addEventListener("click", (e)=>{
+  notesPreviewMode = !notesPreviewMode;
+  e.target.textContent = notesPreviewMode ? "Modifier" : "Aperçu";
+  notesText.style.display = notesPreviewMode ? "none" : "block";
+  document.getElementById("notesPreviewBox").style.display = notesPreviewMode ? "block" : "none";
+  if(notesPreviewMode) refreshNotesPreview();
+});
+
+/* ---------------- pan & zoom on the map canvas ---------------- */
+const mapWrap = document.getElementById("mapWrap");
+const mapCanvas = document.getElementById("mapCanvas");
+let CANVAS_W = 1000, CANVAS_H = 700;
+let fitScale = 1, zoom = 1, panX = 0, panY = 0;
+
+function setCanvasSize(width, height){
+  CANVAS_W = width;
+  CANVAS_H = height;
+  mapCanvas.style.width = width + "px";
+  mapCanvas.style.height = height + "px";
+  document.getElementById("highlightSvg").setAttribute("viewBox", `0 0 ${width} ${height}`);
+}
+
+function computeFit(){
+  const rect = mapWrap.getBoundingClientRect();
+  fitScale = Math.min(rect.width/CANVAS_W, rect.height/CANVAS_H);
+}
+function centerView(){
+  const rect = mapWrap.getBoundingClientRect();
+  const s = fitScale*zoom;
+  panX = (rect.width - CANVAS_W*s)/2;
+  panY = (rect.height - CANVAS_H*s)/2;
+}
+function applyTransform(){
+  mapCanvas.style.transform = `translate(${panX}px,${panY}px) scale(${fitScale*zoom})`;
+  updatePinScales();
+}
+function currentMapScale(){ return fitScale*zoom; }
+function updatePinScales(){
+  const s = 1/currentMapScale();
+  document.querySelectorAll(".pin-visual, .pin-popup-inner").forEach(el=>{ el.style.transform = `scale(${s})`; });
+}
+function resetView(){
+  zoom = 1; computeFit(); centerView(); applyTransform();
+}
+window.addEventListener("resize", resetView);
+
+function clientToCanvasRelative(clientX, clientY){
+  const rect = mapWrap.getBoundingClientRect();
+  const localX = clientX-rect.left, localY = clientY-rect.top;
+  const s = fitScale*zoom;
+  return { x:(localX-panX)/s/CANVAS_W, y:(localY-panY)/s/CANVAS_H };
+}
+
+mapWrap.addEventListener("wheel", (e)=>{
+  e.preventDefault();
+  const rect = mapWrap.getBoundingClientRect();
+  const mouseX = e.clientX-rect.left, mouseY = e.clientY-rect.top;
+  const s0 = fitScale*zoom;
+  const factor = e.deltaY < 0 ? 1.12 : 1/1.12;
+  const newZoom = Math.max(0.5, Math.min(5, zoom*factor));
+  const s1 = fitScale*newZoom;
+  panX = mouseX - (mouseX-panX)*(s1/s0);
+  panY = mouseY - (mouseY-panY)*(s1/s0);
+  zoom = newZoom;
+  applyTransform();
+}, {passive:false});
+
+document.getElementById("btnResetView").addEventListener("click", resetView);
+
+let isPanning = false, panStartX=0, panStartY=0, panOrigX=0, panOrigY=0, panMoved=false;
+
+/* multi-touch: 1 finger = pan, 2 fingers = pinch-to-zoom around the midpoint */
+const mapPointers = new Map();
+let pinchStartDist = null, pinchStartZoom = null, pinchMid = null;
+
+mapWrap.addEventListener("pointerdown", (e)=>{
+  if(addMode || highlightMode) return;
+  if(e.target.closest(".pin-marker") || e.target.closest(".pin-popup")) return;
+  mapPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(mapPointers.size === 2){
+    isPanning = false;
+    mapWrap.classList.remove("panning");
+    const pts = [...mapPointers.values()];
+    pinchStartDist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    pinchStartZoom = zoom;
+    const rect = mapWrap.getBoundingClientRect();
+    pinchMid = {x:(pts[0].x+pts[1].x)/2 - rect.left, y:(pts[0].y+pts[1].y)/2 - rect.top};
+    return;
+  }
+  isPanning = true; panMoved = false;
+  panStartX = e.clientX; panStartY = e.clientY; panOrigX = panX; panOrigY = panY;
+  mapWrap.classList.add("panning");
+});
+window.addEventListener("pointermove", (e)=>{
+  if(mapPointers.has(e.pointerId)) mapPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+  if(mapPointers.size >= 2 && pinchStartDist){
+    const pts = [...mapPointers.values()];
+    const dist = Math.hypot(pts[0].x-pts[1].x, pts[0].y-pts[1].y);
+    const s0 = fitScale*zoom;
+    const newZoom = Math.max(0.5, Math.min(5, pinchStartZoom * (dist/pinchStartDist)));
+    const s1 = fitScale*newZoom;
+    panX = pinchMid.x - (pinchMid.x-panX)*(s1/s0);
+    panY = pinchMid.y - (pinchMid.y-panY)*(s1/s0);
+    zoom = newZoom;
+    applyTransform();
+    return;
+  }
+  if(!isPanning) return;
+  const dx = e.clientX-panStartX, dy = e.clientY-panStartY;
+  if(Math.hypot(dx,dy) > 4) panMoved = true;
+  panX = panOrigX + dx; panY = panOrigY + dy;
+  applyTransform();
+});
+function releaseMapPointer(e){
+  mapPointers.delete(e.pointerId);
+  if(mapPointers.size < 2) pinchStartDist = null;
+  if(mapPointers.size === 0){
+    isPanning = false;
+    mapWrap.classList.remove("panning");
+  }
+}
+window.addEventListener("pointerup", releaseMapPointer);
+window.addEventListener("pointercancel", releaseMapPointer);
+
+/* ---------------- pins: add / edit / delete ---------------- */
+const ICONS = ["🏛️","🍺","⚔️","📖","🕯️","👁️","⭐","💀","🔮","🏠","⚕️","🌙"];
+const COLORS = ["#c9a227","#5fd6c2","#d6704f","#a878d6","#7bbf9a","#7c93d6","#b0938f","#e8e8f0"];
+let selectedIcon = ICONS[0];
+let selectedColor = COLORS[0];
+let editingPinId = null;
+let pendingCoords = null;
+let addMode = false;
+
+const iconRow = document.getElementById("iconRow");
+ICONS.forEach(ic=>{
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = ic;
+  b.addEventListener("click", ()=>{ selectedIcon = ic; renderIconRow(); });
+  iconRow.appendChild(b);
+});
+function renderIconRow(){
+  [...iconRow.children].forEach((b,i)=> b.classList.toggle("sel", ICONS[i]===selectedIcon));
+}
+const colorRow = document.getElementById("colorRow");
+COLORS.forEach(c=>{
+  const b = document.createElement("button");
+  b.type = "button"; b.style.background = c;
+  b.addEventListener("click", ()=>{ selectedColor = c; renderColorRow(); });
+  colorRow.appendChild(b);
+});
+function renderColorRow(){
+  [...colorRow.children].forEach((b,i)=> b.classList.toggle("sel", COLORS[i]===selectedColor));
+}
+renderIconRow(); renderColorRow();
+
+const btnAddPin = document.getElementById("btnAddPin");
+btnAddPin.addEventListener("click", ()=>{
+  addMode = !addMode;
+  btnAddPin.classList.toggle("active", addMode);
+  mapWrap.classList.toggle("browsing", !addMode);
+  toast(addMode ? "Clique sur la carte pour placer un point." : "Mode ajout désactivé.");
+});
+
+mapWrap.addEventListener("click", (e)=>{
+  if(!addMode) return;
+  if(!auth.currentUser){ toast("Connecte-toi d'abord."); return; }
+  const rel = clientToCanvasRelative(e.clientX, e.clientY);
+  pendingCoords = { x: Math.min(1,Math.max(0,rel.x)), y: Math.min(1,Math.max(0,rel.y)) };
+  openPinModal(null);
+  addMode = false;
+  btnAddPin.classList.remove("active");
+  mapWrap.classList.add("browsing");
+});
+
+/* ---------------- highlighter tool ---------------- */
+const HL_COLORS = ["#f5e050","#ff7ab8","#6bdb8a","#6bc4ff","#ffab5c"];
+const HL_SIZES = [ {label:"fin", w:8}, {label:"moyen", w:16}, {label:"épais", w:28} ];
+let selectedHlColor = HL_COLORS[0];
+let selectedHlSize = HL_SIZES[1].w;
+let highlightMode = false;
+let strokes = {};
+let drawingStroke = null; // {points:[{x,y}...]} in canvas px space
+const highlightSvg = document.getElementById("highlightSvg");
+const btnHighlight = document.getElementById("btnHighlight");
+const highlightToolbar = document.getElementById("highlightToolbar");
+
+const hlColorsEl = document.getElementById("hlColors");
+HL_COLORS.forEach(c=>{
+  const b = document.createElement("button");
+  b.type = "button"; b.style.background = c;
+  b.addEventListener("click", ()=>{ selectedHlColor = c; renderHlColors(); });
+  hlColorsEl.appendChild(b);
+});
+function renderHlColors(){ [...hlColorsEl.children].forEach((b,i)=> b.classList.toggle("sel", HL_COLORS[i]===selectedHlColor)); }
+const hlSizesEl = document.getElementById("hlSizes");
+HL_SIZES.forEach(s=>{
+  const b = document.createElement("button");
+  b.type = "button"; b.title = s.label;
+  b.innerHTML = `<span style="width:${6+s.w*0.3}px;height:${6+s.w*0.3}px;"></span>`;
+  b.addEventListener("click", ()=>{ selectedHlSize = s.w; renderHlSizes(); });
+  hlSizesEl.appendChild(b);
+});
+function renderHlSizes(){ [...hlSizesEl.children].forEach((b,i)=> b.classList.toggle("sel", HL_SIZES[i].w===selectedHlSize)); }
+renderHlColors(); renderHlSizes();
+
+btnHighlight.addEventListener("click", ()=>{
+  highlightMode = !highlightMode;
+  btnHighlight.classList.toggle("active", highlightMode);
+  highlightToolbar.style.display = highlightMode ? "flex" : "none";
+  mapWrap.classList.toggle("highlighting", highlightMode);
+  highlightSvg.classList.toggle("erase-mode", highlightMode);
+  if(highlightMode){
+    addMode = false; btnAddPin.classList.remove("active");
+    toast("Dessine pour surligner · clique un trait existant pour l'effacer.");
+  }
+});
+document.getElementById("hlDone").addEventListener("click", ()=>{
+  highlightMode = false;
+  btnHighlight.classList.remove("active");
+  highlightToolbar.style.display = "none";
+  mapWrap.classList.remove("highlighting");
+  highlightSvg.classList.remove("erase-mode");
+});
+document.getElementById("hlClearMine").addEventListener("click", async ()=>{
+  if(!auth.currentUser) return;
+  const mine = Object.values(strokes).filter(s=> s.createdBy === auth.currentUser.email);
+  if(!mine.length){ toast("Tu n'as aucun trait sur cette carte."); return; }
+  if(!confirm(`Effacer tes ${mine.length} trait(s) sur cette carte ?`)) return;
+  try{ await Promise.all(mine.map(s=> strokesRef.doc(s.id).delete())); toast("Traits effacés."); }
+  catch(e){ console.error(e); toast("Échec de la suppression."); }
+});
+
+function pathFromPoints(points){
+  if(!points.length) return "";
+  return "M" + points.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" L");
+}
+
+mapWrap.addEventListener("pointerdown", (e)=>{
+  if(!highlightMode) return;
+  if(!auth.currentUser){ toast("Connecte-toi d'abord."); return; }
+  const strokeEl = e.target.closest("path[data-stroke-id]");
+  if(strokeEl){
+    const id = strokeEl.getAttribute("data-stroke-id");
+    strokesRef.doc(id).delete().catch(err=>{ console.error(err); toast("Échec de la suppression du trait."); });
+    return;
+  }
+  const rel = clientToCanvasRelative(e.clientX, e.clientY);
+  drawingStroke = { color: selectedHlColor, width: selectedHlSize, points: [{x: rel.x*CANVAS_W, y: rel.y*CANVAS_H}] };
+  renderDrawingPreview();
+});
+window.addEventListener("pointermove", (e)=>{
+  if(!drawingStroke) return;
+  const rel = clientToCanvasRelative(e.clientX, e.clientY);
+  drawingStroke.points.push({x: rel.x*CANVAS_W, y: rel.y*CANVAS_H});
+  renderDrawingPreview();
+});
+window.addEventListener("pointerup", async ()=>{
+  if(!drawingStroke) return;
+  const s = drawingStroke; drawingStroke = null;
+  if(s.points.length < 2){
+    const previewEl = document.getElementById("hlPreview");
+    if(previewEl) previewEl.remove();
+    return;
+  }
+  try{
+    await strokesRef.add({
+      color: s.color, width: s.width, points: s.points,
+      createdBy: auth.currentUser.email, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // success: the strokes onSnapshot listener re-renders the whole layer (renderStrokes),
+    // which naturally replaces this temporary preview path — remove it just in case it hasn't fired yet.
+    const previewEl = document.getElementById("hlPreview");
+    if(previewEl) previewEl.remove();
+  }catch(e){
+    console.error(e);
+    toast("Échec de l'enregistrement — vérifie que la règle Firestore 'strokes' est publiée.");
+    // keep the preview visible on failure so the drawing isn't just lost
+  }
+});
+function renderDrawingPreview(){
+  let previewEl = document.getElementById("hlPreview");
+  if(!previewEl){
+    previewEl = document.createElementNS("http://www.w3.org/2000/svg","path");
+    previewEl.id = "hlPreview";
+    previewEl.setAttribute("fill","none");
+    previewEl.setAttribute("stroke-linecap","round");
+    previewEl.setAttribute("stroke-linejoin","round");
+    previewEl.setAttribute("opacity","0.45");
+    previewEl.style.mixBlendMode = "multiply";
+    highlightSvg.appendChild(previewEl);
+  }
+  previewEl.setAttribute("stroke", drawingStroke.color);
+  previewEl.setAttribute("stroke-width", drawingStroke.width);
+  previewEl.setAttribute("d", pathFromPoints(drawingStroke.points));
+}
+function renderStrokes(){
+  highlightSvg.innerHTML = "";
+  Object.values(strokes).forEach(s=>{
+    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+    path.setAttribute("data-stroke-id", s.id);
+    path.setAttribute("fill","none");
+    path.setAttribute("stroke", s.color);
+    path.setAttribute("stroke-width", s.width);
+    path.setAttribute("stroke-linecap","round");
+    path.setAttribute("stroke-linejoin","round");
+    path.setAttribute("opacity","0.45");
+    path.style.mixBlendMode = "multiply";
+    path.setAttribute("d", pathFromPoints(s.points||[]));
+    highlightSvg.appendChild(path);
+  });
+}
+
+function openPinModal(pin){
+  editingPinId = pin ? pin.id : null;
+  document.getElementById("pinModalTitle").textContent = pin ? "Modifier le point" : "Nouveau point d'intérêt";
+  document.getElementById("pinName").value = pin ? pin.name : "";
+  document.getElementById("pinTags").value = pin ? (pin.tags||[]).join(", ") : "";
+  document.getElementById("pinNotes").value = pin ? (pin.notes||"") : "";
+  selectedIcon = pin ? pin.icon : ICONS[0];
+  selectedColor = pin ? pin.color : COLORS[0];
+  renderIconRow(); renderColorRow();
+  document.getElementById("pinDeleteBtn").style.display = pin ? "inline-block" : "none";
+  document.getElementById("pinModalBackdrop").classList.add("show");
+  setTimeout(()=> document.getElementById("pinName").focus(), 50);
+}
+function closePinModal(){
+  document.getElementById("pinModalBackdrop").classList.remove("show");
+  editingPinId = null; pendingCoords = null;
+}
+document.getElementById("pinCancelBtn").addEventListener("click", closePinModal);
+document.getElementById("pinModalBackdrop").addEventListener("click", (e)=>{
+  if(e.target.id === "pinModalBackdrop") closePinModal();
+});
+
+document.getElementById("pinSaveBtn").addEventListener("click", async ()=>{
+  if(!auth.currentUser){ toast("Connecte-toi d'abord."); return; }
+  const name = document.getElementById("pinName").value.trim();
+  if(!name){ toast("Donne un nom au point."); return; }
+  const tags = document.getElementById("pinTags").value.split(",").map(s=>s.trim()).filter(Boolean);
+  const notes = document.getElementById("pinNotes").value;
+  const payload = {
+    name, icon:selectedIcon, color:selectedColor, tags, notes,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    updatedBy: auth.currentUser.email
+  };
+  try{
+    if(editingPinId){
+      await pinsRef.doc(editingPinId).set(payload, {merge:true});
+    } else {
+      payload.x = pendingCoords.x; payload.y = pendingCoords.y;
+      payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      payload.createdBy = auth.currentUser.email;
+      await pinsRef.add(payload);
+    }
+    toast("Point enregistré.");
+    closePinModal();
+  }catch(e){ console.error(e); toast("Échec de l'enregistrement du point."); }
+});
+document.getElementById("pinDeleteBtn").addEventListener("click", async ()=>{
+  if(!editingPinId) return;
+  try{ await pinsRef.doc(editingPinId).delete(); toast("Point supprimé."); closePinModal(); closePinPopup(); }
+  catch(e){ console.error(e); toast("Échec de la suppression."); }
+});
+
+/* ---------------- pin rendering, popup, and drag-to-move ---------------- */
+const pinLayer = document.getElementById("pinLayer");
+let activeFilterTag = "";
+let openPopupId = null;
+let draggingPinId = null, dragMoved = false;
+
+function renderTagFilter(){
+  const sel = document.getElementById("tagFilter");
+  const current = sel.value;
+  const tagSet = new Set();
+  Object.values(pins).forEach(p=> (p.tags||[]).forEach(t=> tagSet.add(t)));
+  sel.innerHTML = '<option value="">Tous les tags</option>' +
+    [...tagSet].sort().map(t=>`<option value="${t}">${t}</option>`).join("");
+  sel.value = tagSet.has(current) ? current : "";
+  activeFilterTag = sel.value;
+}
+document.getElementById("tagFilter").addEventListener("change", (e)=>{
+  activeFilterTag = e.target.value;
+  renderPins();
+});
+
+function renderPins(){
+  pinLayer.innerHTML = "";
+  Object.values(pins).forEach(p=>{
+    if(activeFilterTag && !(p.tags||[]).includes(activeFilterTag)) return;
+    const el = document.createElement("div");
+    el.className = "pin-marker";
+    el.style.left = (p.x*100)+"%";
+    el.style.top = (p.y*100)+"%";
+    el.innerHTML = `<div class="pin-visual">
+        <div class="dot" style="background:${p.color}"><span>${escapeHtml(p.icon)}</span></div>
+        <div class="tag-label">${escapeHtml(p.name)}</div>
+      </div>`;
+    attachPinDrag(el, p);
+    pinLayer.appendChild(el);
+  });
+  updatePinScales();
+}
+
+function attachPinDrag(el, pin){
+  el.addEventListener("pointerdown", (e)=>{
+    e.stopPropagation();
+    if(!auth.currentUser){ toast("Connecte-toi d'abord."); return; }
+    draggingPinId = pin.id; dragMoved = false;
+    el.classList.add("dragging");
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener("pointermove", (e)=>{
+    if(draggingPinId !== pin.id) return;
+    dragMoved = true;
+    const rel = clientToCanvasRelative(e.clientX, e.clientY);
+    pin.x = Math.min(1,Math.max(0,rel.x));
+    pin.y = Math.min(1,Math.max(0,rel.y));
+    el.style.left = (pin.x*100)+"%";
+    el.style.top = (pin.y*100)+"%";
+  });
+  el.addEventListener("pointerup", async (e)=>{
+    if(draggingPinId !== pin.id) return;
+    el.classList.remove("dragging");
+    const moved = dragMoved;
+    draggingPinId = null; dragMoved = false;
+    if(moved){
+      try{ await pinsRef.doc(pin.id).update({x:pin.x, y:pin.y}); }
+      catch(err){ console.error(err); toast("Échec du déplacement."); renderPins(); }
+    } else {
+      togglePinPopup(pin, el);
+    }
+  });
+}
+
+function closePinPopup(){
+  const existing = document.getElementById("pinPopup");
+  if(existing) existing.remove();
+  openPopupId = null;
+}
+function togglePinPopup(p, anchorEl){
+  if(openPopupId === p.id){ closePinPopup(); return; }
+  closePinPopup();
+  openPopupId = p.id;
+  const popup = document.createElement("div");
+  popup.className = "pin-popup"; popup.id = "pinPopup";
+  popup.style.left = anchorEl.style.left; popup.style.top = anchorEl.style.top;
+  popup.innerHTML = `
+    <div class="pin-popup-inner">
+      <span class="close" id="popupClose">✕</span>
+      <h4>${escapeHtml(p.icon)} ${escapeHtml(p.name)}</h4>
+      <div class="tags">${(p.tags||[]).map(t=>`<span>${escapeHtml(t)}</span>`).join("")}</div>
+      <div class="notes md-content">${p.notes ? renderMarkdown(p.notes) : "<em>Pas de notes.</em>"}</div>
+      <div class="meta">ajouté par ${escapeHtml(p.createdBy||"?")} · glisse le point pour le déplacer</div>
+      <div class="row">
+        <button class="btn ghost small" id="popupEdit">Modifier</button>
+      </div>
+    </div>
+  `;
+  pinLayer.appendChild(popup);
+  updatePinScales();
+  document.getElementById("popupClose").addEventListener("click", closePinPopup);
+  document.getElementById("popupEdit").addEventListener("click", ()=>{ closePinPopup(); openPinModal(p); });
+}
+mapWrap.addEventListener("click", (e)=>{
+  if(panMoved) return;
+  if(e.target.closest(".pin-marker") || e.target.closest(".pin-popup")) return;
+  closePinPopup();
+});
+
+/* ---------------- stylized original maps ----------------
+   Hand-composed vector illustrations, loosely inspired by real-world
+   geography for flavor (hills, coastline layout) but entirely original
+   artwork — no traced maps or images are used. */
+/* helper: a small landmark = icon glyph (as raw SVG markup) + italic label underneath */
+function landmark(x, y, iconSvg, label, size){
+  size = size||13;
+  return `<g transform="translate(${x},${y})">${iconSvg}
+    <text x="0" y="${size+16}" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="${size}" fill="#2a2010" stroke="#e8dcb8" stroke-width="3" paint-order="stroke">${label}</text>
+  </g>`;
+}
+const ICON_TOWER = `<polygon points="-9,10 -9,-6 -5,-14 5,-14 9,-6 9,10" fill="#6b6558" stroke="#332f28" stroke-width="1.3"/><rect x="-2" y="-20" width="4" height="8" fill="#332f28"/>`;
+const ICON_MONUMENT = `<rect x="-10" y="4" width="20" height="4" fill="#8a7a52"/>${[-7,-2,3,8].map(dx=>`<rect x="${dx-1.3}" y="-10" width="2.6" height="14" fill="#8a7a52"/>`).join("")}<path d="M-10,-10 L10,-10 L6,-16 L-6,-16 Z" fill="#8a7a52"/>`;
+const ICON_KIRKYARD = `<rect x="-9" y="-2" width="18" height="8" fill="#8a9a80" opacity="0.6"/>${[-6,-1,4].map(dx=>`<rect x="${dx}" y="-9" width="2.4" height="9" fill="#5c6b52"/>`).join("")}`;
+const ICON_MUSEUM = `<polygon points="-12,6 -12,-2 0,-12 12,-2 12,6" fill="#b3a5c4" stroke="#4a3a6b" stroke-width="1.3"/><rect x="-6" y="-2" width="4" height="8" fill="#4a3a6b"/><rect x="2" y="-2" width="4" height="8" fill="#4a3a6b"/>`;
+const ICON_SPIRE = `<polygon points="0,-22 6,4 -6,4" fill="#8a8a94" stroke="#3a3a44" stroke-width="1.2"/><rect x="-8" y="4" width="16" height="6" fill="#8a8a94" stroke="#3a3a44" stroke-width="1"/>`;
+const ICON_TRAIN = `<rect x="-12" y="-6" width="24" height="12" rx="2" fill="#7a6a52" stroke="#3a2c18" stroke-width="1.3"/><circle cx="-6" cy="7" r="3" fill="#2a2010"/><circle cx="6" cy="7" r="3" fill="#2a2010"/>`;
+const ICON_PARLIAMENT = `<rect x="-14" y="-2" width="28" height="10" rx="2" fill="#9aa89a" stroke="#3f4a2c" stroke-width="1.3"/><path d="M-14,-2 L0,-12 L14,-2" fill="none" stroke="#3f4a2c" stroke-width="1.3"/>`;
+
+const MAP_BUILDERS = {
+  edinburgh: function(svg){
+    svg.innerHTML = `
+    <defs>
+      <radialGradient id="parchment" cx="50%" cy="45%" r="75%">
+        <stop offset="0%" stop-color="#e8dcb8"/>
+        <stop offset="60%" stop-color="#d9caa0"/>
+        <stop offset="100%" stop-color="#b9a878"/>
+      </radialGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#4a86bd"/>
+        <stop offset="100%" stop-color="#2c5580"/>
+      </linearGradient>
+      <radialGradient id="hill" cx="40%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="#93a374"/>
+        <stop offset="100%" stop-color="#5c6b45"/>
+      </radialGradient>
+      <filter id="grain" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" result="noise"/>
+        <feColorMatrix in="noise" type="saturate" values="0"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.05"/></feComponentTransfer>
+        <feComposite operator="over" in2="SourceGraphic"/>
+      </filter>
+      <filter id="softZone" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur stdDeviation="24"/>
+      </filter>
+    </defs>
+
+    <rect width="1000" height="700" fill="url(#parchment)"/>
+
+    <!-- soft district colour-wash, loosely following real Edinburgh geography:
+         Old Town / New Town / Stockbridge-Dean / Leith / West End-Haymarket /
+         Southside / Marchmont-Bruntsfield — original watercolour zones, not a
+         traced map. -->
+    <g filter="url(#softZone)" style="mix-blend-mode:multiply">
+      <ellipse cx="470" cy="410" rx="270" ry="95" fill="#7a93b0" opacity="0.55"/>
+      <ellipse cx="520" cy="230" rx="270" ry="100" fill="#c98a95" opacity="0.5"/>
+      <ellipse cx="670" cy="180" rx="120" ry="90" fill="#c98a95" opacity="0.4"/>
+      <ellipse cx="160" cy="220" rx="150" ry="105" fill="#cbb84a" opacity="0.42"/>
+      <ellipse cx="560" cy="110" rx="170" ry="75" fill="#6ba05a" opacity="0.45"/>
+      <ellipse cx="130" cy="430" rx="150" ry="110" fill="#a97a4a" opacity="0.42"/>
+      <ellipse cx="700" cy="545" rx="160" ry="95" fill="#9a6bb0" opacity="0.4"/>
+      <ellipse cx="320" cy="575" rx="220" ry="100" fill="#c9954a" opacity="0.38"/>
+    </g>
+
+    <!-- Firth of Forth (north coastline) with waves -->
+    <path d="M0,60 Q150,90 320,55 Q520,20 700,70 Q860,100 1000,55 L1000,0 L0,0 Z" fill="url(#water)"/>
+    <path d="M0,60 Q150,90 320,55 Q520,20 700,70 Q860,100 1000,55" fill="none" stroke="#1c3a5a" stroke-width="2" opacity="0.6"/>
+    ${[20,35,48].map(y=>`<path d="M40,${y} q30,-10 60,0 t60,0 t60,0 t60,0 t60,0 t60,0 t60,0 t60,0 t60,0 t60,0" fill="none" stroke="#dff0ff" stroke-width="1.4" opacity="0.35"/>`).join("")}
+    <!-- little boats near Leith harbour -->
+    ${[[430,45],[600,38],[520,52]].map(([x,y])=>`
+      <g transform="translate(${x},${y})">
+        <path d="M-10,4 L10,4 L6,10 L-6,10 Z" fill="#3a2c18"/>
+        <line x1="0" y1="4" x2="0" y2="-10" stroke="#3a2c18" stroke-width="1.4"/>
+        <path d="M0,-10 L9,0 L0,1 Z" fill="#e8dcb8"/>
+      </g>`).join("")}
+
+    <!-- Water of Leith, winding from Dean Village through Stockbridge toward the Forth -->
+    <path d="M90,255 Q140,230 175,205 Q230,175 260,140 Q300,105 360,90" fill="none" stroke="#4a86bd" stroke-width="4" opacity="0.55" stroke-linecap="round"/>
+    <text x="300" y="115" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#2c5580" transform="rotate(-32 300 115)">Water of Leith</text>
+
+    <!-- Leith (port district) -->
+    <g>
+      <rect x="470" y="60" width="90" height="42" rx="6" fill="#a98f5c" stroke="#6b5a35" stroke-width="1.5"/>
+      <rect x="478" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
+      <rect x="500" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
+      <rect x="522" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
+      <text x="515" y="118" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#2a3a18" letter-spacing="1">LEITH</text>
+    </g>
+    <!-- Leith Walk connecting the port down to New Town -->
+    <path d="M560,120 Q650,170 705,222" fill="none" stroke="#8a7346" stroke-width="2.5" opacity="0.55" stroke-dasharray="2,5"/>
+    <text x="650" y="168" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(38 650 168)">Leith Walk</text>
+
+    <!-- Stockbridge -->
+    <g>
+      <ellipse cx="230" cy="185" rx="52" ry="30" fill="#c7b96a" stroke="#6b5a35" stroke-width="1.5" opacity="0.9"/>
+      <text x="230" y="190" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="13" fill="#3a2c18">Stockbridge</text>
+    </g>
+
+    <!-- Dean Village (west) -->
+    <g>
+      <ellipse cx="130" cy="255" rx="52" ry="32" fill="#b3a173" stroke="#6b5a35" stroke-width="1.5"/>
+      ${[[112,246],[148,250],[130,268]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="7" fill="#5c7a45"/>`).join("")}
+      <text x="130" y="260" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12.5" fill="#3a2c18">Dean Village</text>
+    </g>
+
+    <!-- Calton Hill (between New Town and Holyrood) -->
+    <g>
+      <ellipse cx="745" cy="270" rx="58" ry="42" fill="url(#hill)" stroke="#3f4a2c" stroke-width="1.6"/>
+      ${landmark(745,255,ICON_MONUMENT,"Calton Hill",11)}
+    </g>
+
+    <!-- New Town grid with named streets -->
+    <g opacity="0.95">
+      ${[0,1,2,3,4,5].map(i=>`<rect x="${270+i*68}" y="168" width="56" height="36" rx="3" fill="#cabf94" stroke="#8a7a52" stroke-width="1"/>`).join("")}
+      ${[0,1,2,3,4,5].map(i=>`<rect x="${270+i*68}" y="210" width="56" height="36" rx="3" fill="#cabf94" stroke="#8a7a52" stroke-width="1"/>`).join("")}
+      ${[0,1,2,3,4,5].map(i=>`<rect x="${270+i*68}" y="252" width="56" height="36" rx="3" fill="#cabf94" stroke="#8a7a52" stroke-width="1"/>`).join("")}
+      <line x1="262" y1="208" x2="678" y2="208" stroke="#7a6a45" stroke-width="1.5" opacity="0.7"/>
+      <line x1="262" y1="250" x2="678" y2="250" stroke="#7a6a45" stroke-width="1.5" opacity="0.7"/>
+      <text x="258" y="205" text-anchor="end" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">Queen St.</text>
+      <text x="258" y="247" text-anchor="end" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">George St.</text>
+      <text x="330" y="292" text-anchor="start" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">Princes St.</text>
+      <text x="500" y="155" text-anchor="middle" font-family="Cinzel, serif" font-size="16" fill="#4a3c22" letter-spacing="1">NEW TOWN</text>
+      <text x="690" y="205" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">York Pl.</text>
+    </g>
+
+    <!-- Princes Street Gardens (valley between New Town and the Castle) -->
+    <g>
+      <path d="M270,296 Q470,318 660,296 L660,320 Q470,342 270,320 Z" fill="#8fae6f" opacity="0.85" stroke="#4a5c33" stroke-width="1"/>
+      ${[[320,308],[420,314],[560,308]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="5" fill="#5c7a3f"/>`).join("")}
+      ${landmark(470,300,ICON_SPIRE,"Scott Monument",10)}
+      ${landmark(600,300,ICON_TRAIN,"Waverley Station",10)}
+    </g>
+
+    <!-- Castle Rock (west hill) with contour lines -->
+    <g>
+      <ellipse cx="230" cy="360" rx="90" ry="50" fill="url(#hill)" stroke="#3f4a2c" stroke-width="2"/>
+      <ellipse cx="230" cy="360" rx="65" ry="35" fill="none" stroke="#3f4a2c" stroke-width="1" opacity="0.4"/>
+      <ellipse cx="230" cy="360" rx="40" ry="20" fill="none" stroke="#3f4a2c" stroke-width="1" opacity="0.4"/>
+      <polygon points="200,330 215,280 235,310 255,275 270,330" fill="#6b6558" stroke="#332f28" stroke-width="2"/>
+      <rect x="238" y="285" width="10" height="26" fill="#332f28"/>
+      <rect x="205" y="305" width="8" height="20" fill="#332f28"/>
+      <text x="230" y="422" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2418" letter-spacing="1">EDINBURGH CASTLE</text>
+    </g>
+
+    <!-- Grassmarket, Cowgate, Greyfriars -->
+    <g>
+      <ellipse cx="255" cy="450" rx="60" ry="26" fill="#c2b689" stroke="#6b5a35" stroke-width="1.5"/>
+      <text x="255" y="455" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="13" fill="#3a2c18">Grassmarket</text>
+    </g>
+    <g>
+      <ellipse cx="335" cy="475" rx="48" ry="20" fill="#c2b689" stroke="#6b5a35" stroke-width="1.5" opacity="0.9"/>
+      <text x="335" y="479" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11.5" fill="#3a2c18">Cowgate</text>
+    </g>
+    ${landmark(255,490,ICON_KIRKYARD,"Greyfriars Kirkyard",9.5)}
+
+    <!-- Royal Mile / Old Town ribbon, with building silhouettes -->
+    <g>
+      <path d="M260,350 L650,310 L670,340 L280,382 Z" fill="#b8a878" stroke="#5c4a2a" stroke-width="2"/>
+      <line x1="270" y1="366" x2="660" y2="325" stroke="#8a7346" stroke-width="1" opacity="0.6" stroke-dasharray="3,4"/>
+      ${[0,1,2,3,4,5,6,7,8,9].map(i=>{
+        const t = i/9, x = 280+t*(650-280), y = 365-t*40;
+        const h = 14+((i%3)*4);
+        return `<rect x="${x-13}" y="${y-h}" width="26" height="${h}" transform="rotate(-6 ${x} ${y})" fill="${i%2? '#a9895a':'#9c7f4d'}" stroke="#5c4a2a" stroke-width="1"/>`;
+      }).join("")}
+      ${landmark(400,338,ICON_SPIRE,"St Giles' Cathedral",10)}
+      <text x="460" y="418" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2010" letter-spacing="1">OLD TOWN — ROYAL MILE</text>
+      <text x="300" y="345" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10" fill="#3a2c18">Lawnmarket</text>
+      <text x="560" y="330" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10" fill="#3a2c18">Canongate</text>
+    </g>
+
+    <!-- National Museum of Scotland (Chambers St, at the Old Town / Southside border) -->
+    ${landmark(430,500,ICON_MUSEUM,"National Museum",10)}
+
+    <!-- Holyrood Palace + Scottish Parliament -->
+    <g>
+      <rect x="665" y="355" width="72" height="42" rx="4" fill="#c2b0e0" stroke="#4a3a6b" stroke-width="1.5"/>
+      <rect x="673" y="363" width="14" height="14" fill="#a898c8" stroke="#4a3a6b" stroke-width="1"/>
+      <rect x="705" y="363" width="14" height="14" fill="#a898c8" stroke="#4a3a6b" stroke-width="1"/>
+      <text x="701" y="414" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12.5" fill="#2a2010">Holyrood Palace</text>
+    </g>
+    ${landmark(770,400,ICON_PARLIAMENT,"Scottish Parliament",9.5)}
+
+    <!-- Arthur's Seat (east hill) with contour lines -->
+    <g>
+      <ellipse cx="850" cy="340" rx="110" ry="75" fill="url(#hill)" stroke="#3f4a2c" stroke-width="2"/>
+      <ellipse cx="850" cy="340" rx="80" ry="52" fill="none" stroke="#3f4a2c" stroke-width="1" opacity="0.4"/>
+      <ellipse cx="850" cy="340" rx="48" ry="30" fill="none" stroke="#3f4a2c" stroke-width="1" opacity="0.4"/>
+      <polygon points="810,320 850,250 900,310 870,350" fill="#7a8a5a" stroke="#3f4a2c" stroke-width="1.5"/>
+      ${[[785,375],[910,385],[845,405]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6" fill="#4f5c38"/>`).join("")}
+      <text x="850" y="428" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2418" letter-spacing="1">ARTHUR'S SEAT</text>
+      <text x="850" y="443" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#2a2418">Holyrood Park</text>
+    </g>
+
+    <!-- The Meadows (south park), with trees -->
+    <g>
+      <ellipse cx="400" cy="555" rx="130" ry="50" fill="#8fae6f" stroke="#4a5c33" stroke-width="1.5" opacity="0.9"/>
+      ${[[330,535],[360,570],[390,530],[425,565],[460,535],[440,578]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="8" fill="#5c7a3f" stroke="#3a4c28" stroke-width="1"/>`).join("")}
+      <text x="400" y="560" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#2a3318" letter-spacing="1">THE MEADOWS</text>
+    </g>
+    <text x="400" y="614" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#3a2c18">Melville Drive</text>
+    <ellipse cx="230" cy="610" rx="70" ry="24" fill="#8fae6f" stroke="#4a5c33" stroke-width="1.3" opacity="0.75"/>
+    <text x="230" y="614" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#2a3318">Bruntsfield Links</text>
+
+    <!-- Marchmont / Bruntsfield / Tollcross / Fountainbridge (south-west) -->
+    <g opacity="0.9">
+      ${[0,1,2].map(i=>`<rect x="${150+i*55}" y="590" width="45" height="55" rx="3" fill="#d0b98a" stroke="#6b5a35" stroke-width="1"/>`).join("")}
+      <text x="215" y="660" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12" fill="#3a2c18">Marchmont</text>
+    </g>
+    <g opacity="0.9">
+      ${[0,1].map(i=>`<rect x="${40+i*50}" y="500" width="42" height="55" rx="3" fill="#d0a878" stroke="#6b5a35" stroke-width="1"/>`).join("")}
+      <text x="90" y="480" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12" fill="#3a2c18">Tollcross</text>
+    </g>
+    <text x="140" y="530" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Fountainbridge</text>
+
+    <!-- West End / Haymarket / Dalry (west) -->
+    <g opacity="0.9">
+      ${[0,1,2].map(i=>`<rect x="${40+i*48}" y="380" width="40" height="55" rx="3" fill="#c9a878" stroke="#6b5a35" stroke-width="1"/>`).join("")}
+      <text x="100" y="365" text-anchor="middle" font-family="Cinzel, serif" font-size="13" fill="#3a2c18" letter-spacing="0.5">WEST END</text>
+      <text x="60" y="460" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Haymarket</text>
+      <text x="140" y="460" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Dalry</text>
+    </g>
+    <text x="120" y="395" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(-8 120 395)">Lothian Road</text>
+
+    <!-- Southside / Newington -->
+    <g opacity="0.9">
+      ${[0,1,2].map(i=>`<rect x="${610+i*58}" y="480" width="48" height="70" rx="3" fill="#c2b689" stroke="#6b5a35" stroke-width="1"/>`).join("")}
+      <text x="700" y="580" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#3a2c18" letter-spacing="1">SOUTHSIDE</text>
+      <text x="620" y="465" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Nicolson St.</text>
+      <text x="700" y="465" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Clerk St.</text>
+    </g>
+
+    <!-- title cartouche -->
+    <g transform="translate(500,42)">
+      <path d="M-160,-2 Q0,-26 160,-2 Q0,20 -160,-2 Z" fill="#e8dcb8" stroke="#4a3c22" stroke-width="1.5" opacity="0.9"/>
+      <text x="0" y="4" text-anchor="middle" font-family="Cinzel, serif" font-size="24" fill="#3a2c18" letter-spacing="3">ÉDIMBOURG</text>
+    </g>
+
+    <!-- decorative compass rose -->
+    <g transform="translate(920,650)" opacity="0.9">
+      <circle r="38" fill="none" stroke="#4a3c22" stroke-width="1.5"/>
+      <path d="M0,-34 L7,0 L0,34 L-7,0 Z" fill="#4a3c22"/>
+      <path d="M-34,0 L0,-7 L34,0 L0,7 Z" fill="#8a7a52"/>
+      <text x="0" y="-44" text-anchor="middle" font-family="Cinzel, serif" font-size="12" fill="#3a2c18">N</text>
+    </g>
+
+    <!-- decorative border with corner flourishes -->
+    <rect x="6" y="6" width="988" height="688" fill="none" stroke="#4a3c22" stroke-width="3" opacity="0.55"/>
+    <rect x="14" y="14" width="972" height="672" fill="none" stroke="#4a3c22" stroke-width="1" opacity="0.35"/>
+    ${[[14,14,1,1],[986,14,-1,1],[14,686,1,-1],[986,686,-1,-1]].map(([x,y,sx,sy])=>`
+      <g transform="translate(${x},${y}) scale(${sx},${sy})" opacity="0.5">
+        <path d="M0,0 Q26,0 26,26 M0,0 Q0,26 26,26" fill="none" stroke="#4a3c22" stroke-width="1.5"/>
+        <circle cx="10" cy="10" r="3" fill="#4a3c22"/>
+      </g>`).join("")}
+
+    <rect width="1000" height="700" filter="url(#grain)" opacity="0.5"/>
+    `;
+  }
+};
+
+const MAP_CONFIGS = {
+  edinburgh: {
+    width: 1448,
+    height: 1086,
+    image: "assets/edinburgh-central-city-map.png"
+  }
+};
+
+function buildImageMap(svg, config){
+  svg.setAttribute("viewBox", `0 0 ${config.width} ${config.height}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  svg.innerHTML = `<image href="${config.image}" x="0" y="0" width="${config.width}" height="${config.height}" preserveAspectRatio="none"/>`;
+}
+
+MAP_BUILDERS.edinburgh = function(svg){
+  buildImageMap(svg, MAP_CONFIGS.edinburgh);
+};
+
+function buildMap(){
+  const svg = document.getElementById("mapSvg");
+  const config = MAP_CONFIGS[MAP_BUILDER] || MAP_CONFIGS.edinburgh;
+  setCanvasSize(config.width, config.height);
+  const fn = MAP_BUILDERS[MAP_BUILDER] || MAP_BUILDERS.edinburgh;
+  fn(svg);
+}
+
+if(FIRESTORE_KEY){
+  buildMap();
+  computeFit(); centerView(); applyTransform();
+}
+</script>
+</body>
+</html>

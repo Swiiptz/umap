@@ -1,0 +1,36 @@
+# OS / explorer
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / local tooling
+.vscode/
+.idea/
+.claude/
+.agents/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+coverage/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
