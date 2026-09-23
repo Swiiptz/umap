@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Almendra:wght@400;700&family=Cinzel+Decorative:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+/* Shared typography: change these variables to update every page. */
+:root {
+  --font-title: 'Almendra', Georgia, serif;
+  --font-heading-2: 'Cinzel Decorative', Georgia, serif;
+  --font-heading-3: 'EB Garamond', Georgia, serif;
+  --font-body: Cambria, Georgia, serif;
+  --font-code: Consolas, 'Courier New', monospace;
+  --text-secondary-size: 0.75rem;
+}
+
+html, body, button, input, select, textarea {
+  font-family: var(--font-body);
+}
+
+h1, .md-content h1 {
+  font-family: var(--font-title);
+}
+
+h2, .md-content h2, #entryTitle {
+  font-family: var(--font-heading-2);
+}
+
+h3, h4, h5, h6,
+.md-content h3, .md-content h4, .md-content h5, .md-content h6,
+.realm-drawer-item .name, .entry-item .etitle {
+  font-family: var(--font-heading-3);
+}
+
+.text-secondary,
+.topbar .hint,
+.hint-text,
+.auth-card .auth-sub,
+.info-panel .sub,
+.zone-hub-inner .sub,
+.notes-drawer .sub,
+.desc-panel .meta,
+.pin-popup .meta,
+.realm-drawer-sub,
+.realm-drawer-item .cat,
+.realm-drawer-empty,
+.roster-card .concept,
+.entry-item .edate,
+.pool-note,
+.resonance-hint,
+.privacy-note,
+.save-status,
+.md-help,
+.loading-text {
+  font-family: var(--font-body);
+  font-size: var(--text-secondary-size);
+  font-style: italic;
+  line-height: 1.45;
+}

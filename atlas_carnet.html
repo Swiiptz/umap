@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Carnet de Campagne — Atlas de l'Umbra</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+
+*{box-sizing:border-box;}
+html,body{
+  margin:0; height:100%; font-family:var(--font-body); color:#e9dfc4; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+  background: radial-gradient(ellipse at 50% -10%, #10231d 0%, #071310 45%, #050c0a 100%) fixed;
+}
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-track{ background:#0a1512; }
+::-webkit-scrollbar-thumb{ background:#2c4038; border-radius:6px; border:2px solid #0a1512; }
+::-webkit-scrollbar-thumb:hover{ background:#3f5a4d; }
+
+.topbar{
+  position:fixed; top:0; left:0; right:0; z-index:20; height:64px;
+  display:flex; gap:12px; align-items:center; justify-content:space-between;
+  padding:12px 20px; background:linear-gradient(180deg, rgba(5,12,10,0.97), rgba(5,12,10,0.9));
+  border-bottom:1px solid #1c2a24;
+}
+.topbar .left{ display:flex; align-items:center; gap:14px; }
+.topbar h1{font-family:var(--font-title); font-size:19px; margin:0; letter-spacing:1.5px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8), 0 0 24px rgba(201,162,39,0.25);}
+.topbar .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+.btn{
+  font-family:var(--font-body); font-size:14px; cursor:pointer;
+  background: linear-gradient(180deg,#ddc677,#c9a227); color:#0d1815; border:1px solid #c9a227; border-radius:6px;
+  padding:8px 14px; font-weight:600;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover{ filter:brightness(1.08); box-shadow:0 2px 14px rgba(201,162,39,0.35); transform:translateY(-1px); }
+.btn:active{ transform:translateY(0); filter:brightness(0.96); }
+.btn.ghost{ background:rgba(15,30,25,0.85); color:#e9dfc4; border:1px solid #3a544b; font-weight:400;}
+.btn.ghost:hover{ box-shadow:0 2px 14px rgba(123,191,154,0.18); border-color:#5a7a6b; }
+.btn.small{ padding:6px 10px; font-size:12.5px; }
+.btn.danger{ background:linear-gradient(180deg,#d6704f,#a83a20); border-color:#a83a20; color:#1a0d08; }
+
+.tab-switch{ display:flex; border:1px solid #3a544b; border-radius:8px; overflow:hidden; }
+.tab-switch button{
+  background:rgba(15,30,25,0.85); color:#b7ad8e; border:none; padding:8px 16px; cursor:pointer;
+  font-family:var(--font-body); font-size:14px;
+}
+.tab-switch button.active{ background:rgba(201,162,39,0.2); color:#ddc677; font-weight:600; }
+
+.user-badge{
+  display:flex; align-items:center; gap:8px; font-size:12px; color:#b7ad8e;
+  font-family:var(--font-body); background:rgba(15,30,25,0.85); border:1px solid #3a544b;
+  border-radius:6px; padding:7px 10px;
+}
+.user-badge button{
+  background:none; border:none; color:#ddc677; cursor:pointer; font-family:var(--font-body);
+  font-size:12px; padding:0; text-decoration:underline;
+}
+
+/* ---- layout: sidebar + editor ---- */
+.journal-layout{
+  position:fixed; top:64px; left:0; right:0; bottom:0; display:flex;
+}
+.entry-sidebar{
+  width:280px; flex:none; border-right:1px solid #1c2a24; display:flex; flex-direction:column;
+  background:rgba(9,17,15,0.6);
+}
+.entry-sidebar-head{ padding:14px 16px 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.entry-sidebar-head h2{ font-family:var(--font-heading-2); font-size:14px; color:#ddc677; margin:0; letter-spacing:0.5px; }
+.entry-list{ flex:1; overflow-y:auto; padding:0 10px 16px; }
+.entry-list::-webkit-scrollbar{ width:6px; }
+.entry-list::-webkit-scrollbar-thumb{ background:#3a544b; border-radius:4px; }
+.entry-item{
+  padding:10px 12px; border-radius:8px; cursor:pointer; margin-bottom:4px;
+  border:1px solid transparent; transition: background .15s ease, border-color .15s ease;
+}
+.entry-item:hover{ background:rgba(201,162,39,0.07); border-color:rgba(201,162,39,0.3); }
+.entry-item.active{ background:rgba(201,162,39,0.12); border-color:#c9a227; box-shadow: inset 3px 0 0 #c9a227; }
+.entry-item .etitle{ font-size:14.5px; color:#e9dfc4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.entry-item .edate{ font-size:10.5px; color:#8a9a91; font-family:var(--font-body); margin-top:2px; }
+.entry-empty{ padding:16px 12px; font-size:12.5px; color:#8a9a91; font-style:italic; line-height:1.5; }
+
+.editor-pane{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.editor-head{
+  padding:14px 22px 10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  border-bottom:1px solid #1c2a24;
+}
+.editor-head input[type=text]{
+  flex:1; min-width:200px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4;
+  border-radius:8px; padding:10px 14px; font-family:var(--font-body); font-size:17px;
+}
+.editor-head input[type=text]:focus{ outline:none; border-color:#c9a227; }
+.editor-head input[type=date]{
+  background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:8px;
+  padding:9px 12px; font-family:var(--font-body); font-size:13px; color-scheme:dark;
+}
+.editor-head input[type=date]:focus{ outline:none; border-color:#c9a227; }
+
+.editor-body{ flex:1; display:flex; flex-direction:column; padding:14px 22px 18px; min-height:0; }
+.editor-body textarea{
+  flex:1; width:100%; background:rgba(5,12,10,0.5); border:1px solid #3a544b; color:#e9dfc4;
+  border-radius:10px; padding:16px 18px; font-family:var(--font-body); font-size:15px; line-height:1.6; resize:none;
+}
+.editor-body textarea:focus{ outline:none; border-color:#c9a227; }
+.md-content{
+  flex:1; overflow-y:auto; padding:16px 18px; background:rgba(5,12,10,0.5); border:1px solid #3a544b;
+  border-radius:10px; font-family:var(--font-body); font-size:15px; line-height:1.6; color:#e9dfc4;
+}
+.md-content:empty::before{ content:"Rien à afficher pour l'instant."; color:#7a8f83; font-style:italic; }
+.md-content h1, .md-content h2, .md-content h3{  color:#ddc677; margin:0 0 10px; }
+.md-content h1{ font-size:22px; } .md-content h2{ font-size:18px; } .md-content h3{ font-size:15px; }
+.md-content p{ margin:0 0 12px; }
+.md-content ul, .md-content ol{ margin:0 0 12px; padding-left:24px; }
+.md-content li{ margin-bottom:4px; }
+.md-content strong{ color:#f0e6c8; }
+.md-content em{ color:#cabf9e; }
+.md-content a{ color:#8fd6ff; }
+.md-content a[data-entry-link]{ color:#e8d488; text-decoration:none; border-bottom:1px dashed #c9a227; }
+.md-content a[data-entry-link]:hover{ color:#ffe9a8; }
+.md-content code{ background:rgba(0,0,0,0.35); padding:1px 5px; border-radius:4px; font-family:var(--font-code); font-size:13px; }
+.md-content blockquote{ margin:0 0 12px; padding-left:12px; border-left:2px solid #3a544b; color:#b7ad8e; font-style:italic; }
+.md-content img{ max-width:100%; border-radius:8px; border:1px solid #3a544b; display:block; margin:8px 0; }
+.md-content hr{ border:none; border-top:1px solid #3a544b; margin:16px 0; }
+.md-content table{ border-collapse:collapse; margin:0 0 12px; }
+.md-content th, .md-content td{ border:1px solid #3a544b; padding:5px 10px; font-size:14px; }
+.md-content th{ background:rgba(201,162,39,0.1); font-family:var(--font-heading-3); font-size:12.5px; color:#ddc677; }
+
+.editor-footer{
+  padding:6px 22px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+}
+.save-status{ font-size:11px; font-family:var(--font-body); color:#7a8f83; }
+.md-help{ font-size:11px; color:#5f6f68; font-family:var(--font-body); }
+
+.no-entry{
+  flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px;
+  color:#8a9a91; font-style:italic;
+}
+
+/* ---- confirm modal ---- */
+.confirm-modal-backdrop{
+  position:fixed; inset:0; z-index:80; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center;
+}
+.confirm-modal{
+  width:360px; max-width:90vw; background:linear-gradient(180deg, rgba(19,36,32,0.98), rgba(13,24,21,0.99));
+  border:1px solid #c9a227; border-radius:12px; padding:22px 24px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+}
+#confirmMessage{ font-family:var(--font-body); font-size:15px; color:#e9dfc4; line-height:1.5; margin-bottom:18px; }
+.confirm-actions{ display:flex; gap:10px; justify-content:flex-end; }
+
+/* ---- loading & auth gate (shared pattern) ---- */
+.loading-screen{
+  position:fixed; inset:0; z-index:70; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  transition:opacity .35s ease;
+}
+.loading-screen.hide{ opacity:0; pointer-events:none; }
+.loading-inner{ text-align:center; }
+.loading-glyph{ font-size:42px; color:#ddc677; display:inline-block; animation: loading-pulse 1.6s ease-in-out infinite; text-shadow:0 0 20px rgba(221,198,119,0.5); }
+.loading-text{ margin-top:14px; font-family:var(--font-body); font-size:12px; color:#8a9a91; letter-spacing:1px; }
+@keyframes loading-pulse{ 0%,100%{ transform:scale(1) rotate(0deg); opacity:0.6; } 50%{ transform:scale(1.18) rotate(180deg); opacity:1; } }
+
+.auth-gate{
+  position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(ellipse at 50% 40%, #0f211c 0%, #050c0a 75%);
+  opacity:1; transition:opacity .4s ease; pointer-events:auto;
+}
+.auth-gate.hide{ opacity:0; pointer-events:none; }
+.auth-card{
+  width:340px; max-width:calc(100vw - 40px); padding:28px 26px;
+  background:linear-gradient(180deg, rgba(19,36,32,0.95), rgba(13,24,21,0.97));
+  border:1px solid #c9a227; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.6); text-align:center;
+}
+.auth-card h1{ font-family:var(--font-title); font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
+.auth-card .auth-sub{ font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:20px; }
+.auth-card input{
+  width:100%; background:rgba(5,12,10,0.7); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
+  padding:10px 12px; font-family:var(--font-body); font-size:14px; margin-bottom:10px;
+}
+.auth-card input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
+.auth-card .btn{ width:100%; margin-top:4px; }
+.auth-card .auth-error{ min-height:18px; font-size:12.5px; color:#e08a7a; margin-top:10px; }
+
+.toast{
+  position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:#132420; border:1px solid #c9a227; color:#ddc677; padding:10px 18px;
+  border-radius:8px; font-size:14px; opacity:0; transition:all .3s ease; z-index:90; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+@media (max-width: 700px){
+  .journal-layout{ flex-direction:column; }
+  .entry-sidebar{ width:100%; max-height:32vh; border-right:none; border-bottom:1px solid #1c2a24; }
+}
+</style>
+<link rel="stylesheet" href="assets/typography.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="left">
+    <button class="btn ghost" id="btnBack">← Atlas</button>
+    <h1>Carnet de Campagne</h1>
+  </div>
+  <div class="tools">
+    <div class="tab-switch">
+      <button id="tabShared" class="active">📖 Partagé</button>
+      <button id="tabPersonal">🔒 Personnel</button>
+    </div>
+    <div class="user-badge" id="userBadge" style="display:none;">
+      <span id="userEmail"></span><button id="btnLogout">se déconnecter</button>
+    </div>
+  </div>
+</div>
+
+<div class="journal-layout">
+  <div class="entry-sidebar">
+    <div class="entry-sidebar-head">
+      <h2 id="sidebarTitle">Séances</h2>
+      <button class="btn small" id="btnNewEntry">+ Nouvelle</button>
+    </div>
+    <div class="entry-list" id="entryList"></div>
+  </div>
+
+  <div class="editor-pane">
+    <div class="no-entry" id="noEntry">
+      <div style="font-size:38px;">📔</div>
+      <div>Choisis une séance dans la liste, ou crée-en une nouvelle.</div>
+    </div>
+    <div class="editor-head" id="editorHead" style="display:none;">
+      <input type="text" id="entryTitle" placeholder="Titre de la séance">
+      <input type="date" id="entryDate">
+      <button class="btn ghost small" id="btnPreviewToggle">Aperçu</button>
+      <button class="btn ghost small" id="btnInsertImage">🖼️ Image</button>
+      <button class="btn danger small" id="btnDeleteEntry">🗑</button>
+    </div>
+    <div class="editor-body" id="editorBody" style="display:none;">
+      <textarea id="entryContent" placeholder="Raconte la séance... (Markdown supporté — utilise [[Titre d'une autre séance]] pour créer un lien croisé)"></textarea>
+      <div class="md-content" id="entryPreview" style="display:none;"></div>
+    </div>
+    <div class="editor-footer" id="editorFooter" style="display:none;">
+      <span class="md-help"># titre · **gras** · *italique* · - liste · [texte](url) · [[Autre séance]] · 🖼️ pour insérer une image</span>
+      <span class="save-status" id="saveStatus">&nbsp;</span>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="imageFileInput" accept="image/*" style="display:none;">
+
+<div class="confirm-modal-backdrop" id="confirmBackdrop" style="display:none;">
+  <div class="confirm-modal">
+    <div id="confirmMessage"></div>
+    <div class="confirm-actions">
+      <button class="btn ghost small" id="confirmCancel">Annuler</button>
+      <button class="btn small" id="confirmOk">Confirmer</button>
+    </div>
+  </div>
+</div>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-inner">
+    <div class="loading-glyph">⊕</div>
+    <div class="loading-text">Chargement de l'Atlas…</div>
+  </div>
+</div>
+
+<div class="auth-gate hide" id="authGate">
+  <div class="auth-card">
+    <h1>Atlas de l'Umbra</h1>
+    <div class="auth-sub">Connexion requise pour accéder au carnet</div>
+    <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Mot de passe" autocomplete="current-password">
+    <button class="btn" id="btnLogin">Se connecter</button>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------------- helpers ---------------- */
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2400);
+}
+function escapeHtml(text){
+  const div = document.createElement("div");
+  div.textContent = text == null ? "" : String(text);
+  return div.innerHTML;
+}
+function customConfirm(message){
+  return new Promise(resolve=>{
+    const backdrop = document.getElementById("confirmBackdrop");
+    const okBtn = document.getElementById("confirmOk");
+    const cancelBtn = document.getElementById("confirmCancel");
+    document.getElementById("confirmMessage").textContent = message;
+    backdrop.style.display = "flex";
+    function cleanup(result){
+      backdrop.style.display = "none";
+      okBtn.removeEventListener("click", onOk);
+      cancelBtn.removeEventListener("click", onCancel);
+      resolve(result);
+    }
+    function onOk(){ cleanup(true); }
+    function onCancel(){ cleanup(false); }
+    okBtn.addEventListener("click", onOk);
+    cancelBtn.addEventListener("click", onCancel);
+  });
+}
+
+/* markdown with [[wiki-links]] between entries + embedded data-URL images allowed */
+function renderMarkdown(text){
+  if(!text) return "";
+  const withWikiLinks = String(text).replace(/\[\[([^\[\]]+)\]\]/g, (m, title)=>{
+    const safe = escapeHtml(title.trim());
+    return `<a href="#" data-entry-link="${safe}">${safe}</a>`;
+  });
+  const rawHtml = marked.parse(withWikiLinks, { breaks:true });
+  return DOMPurify.sanitize(rawHtml, { ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|#|data:image\/)/i });
+}
+
+/* ---------------- Firebase ---------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyCsN-mEZWfxzkNckNDYackhn2cYu-VSFXQ",
+  authDomain: "umap-50aa5.firebaseapp.com",
+  projectId: "umap-50aa5",
+  storageBucket: "umap-50aa5.firebasestorage.app",
+  messagingSenderId: "1081078775679",
+  appId: "1:1081078775679:web:aeac0b5d98de5b7b7e244a"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+document.getElementById("btnBack").addEventListener("click", ()=>{ location.href = "atlas_umbra_3d_prototype.html"; });
+
+async function doLogin(){
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errEl = document.getElementById("authError");
+  errEl.textContent = "";
+  if(!email || !password){ errEl.textContent = "Renseigne l'email et le mot de passe."; return; }
+  try{ await auth.signInWithEmailAndPassword(email, password); }
+  catch(e){ errEl.textContent = "Connexion refusée — vérifie l'email et le mot de passe."; }
+}
+document.getElementById("btnLogin").addEventListener("click", doLogin);
+document.getElementById("authEmail").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("authPassword").focus(); });
+document.getElementById("authPassword").addEventListener("keydown", e=>{ if(e.key==="Enter") doLogin(); });
+document.getElementById("btnLogout").addEventListener("click", ()=> auth.signOut());
+
+let currentUser = null;
+let currentNotebook = "shared";  // "shared" | "personal"
+let entriesUnsub = null;
+let entries = {};                // id -> entry data
+let currentEntryId = null;
+let editorFocused = false;
+
+auth.onAuthStateChanged(user=>{
+  document.getElementById("loadingScreen").classList.add("hide");
+  const gate = document.getElementById("authGate");
+  const badge = document.getElementById("userBadge");
+  if(user){
+    gate.classList.add("hide");
+    badge.style.display = "flex";
+    document.getElementById("userEmail").textContent = user.email;
+    currentUser = user;
+    switchNotebook(currentNotebook, true);
+  } else {
+    gate.classList.remove("hide");
+    badge.style.display = "none";
+    currentUser = null;
+    if(entriesUnsub){ entriesUnsub(); entriesUnsub = null; }
+    entries = {}; currentEntryId = null;
+    renderEntryList(); showEditor(false);
+  }
+});
+
+function notebookRef(){
+  return currentNotebook === "shared"
+    ? db.collection("journal")
+    : db.collection("users").doc(currentUser.uid).collection("journal");
+}
+
+function switchNotebook(name, force){
+  if(!force && name === currentNotebook) return;
+  flushSave();
+  currentNotebook = name;
+  currentEntryId = null;
+  document.getElementById("tabShared").classList.toggle("active", name==="shared");
+  document.getElementById("tabPersonal").classList.toggle("active", name==="personal");
+  document.getElementById("sidebarTitle").textContent = name==="shared" ? "Séances (groupe)" : "Séances (privé)";
+  showEditor(false);
+  if(entriesUnsub){ entriesUnsub(); entriesUnsub = null; }
+  if(!currentUser) return;
+  entriesUnsub = notebookRef().onSnapshot(snap=>{
+    entries = {};
+    snap.forEach(doc=>{ entries[doc.id] = Object.assign({id:doc.id}, doc.data()); });
+    renderEntryList();
+    if(currentEntryId && entries[currentEntryId] && !editorFocused){
+      fillEditor(entries[currentEntryId]);
+    } else if(currentEntryId && !entries[currentEntryId]){
+      // the entry we were viewing was deleted remotely
+      currentEntryId = null; showEditor(false);
+    }
+  }, err=>{ console.error(err); toast("Erreur de synchronisation du carnet."); });
+}
+document.getElementById("tabShared").addEventListener("click", ()=> switchNotebook("shared"));
+document.getElementById("tabPersonal").addEventListener("click", ()=> switchNotebook("personal"));
+
+/* ---------------- entry list ---------------- */
+function sortedEntries(){
+  return Object.values(entries).sort((a,b)=>{
+    const da = a.date||"", dbb = b.date||"";
+    if(da !== dbb) return dbb.localeCompare(da);   // most recent session first
+    return (b.updatedAt&&b.updatedAt.seconds||0) - (a.updatedAt&&a.updatedAt.seconds||0);
+  });
+}
+function renderEntryList(){
+  const list = document.getElementById("entryList");
+  list.innerHTML = "";
+  const all = sortedEntries();
+  if(!all.length){
+    list.innerHTML = '<div class="entry-empty">Aucune séance pour l\'instant — crée la première !</div>';
+    return;
+  }
+  all.forEach(e=>{
+    const item = document.createElement("div");
+    item.className = "entry-item" + (e.id===currentEntryId ? " active" : "");
+    const dateStr = e.date ? new Date(e.date+"T12:00:00").toLocaleDateString("fr-FR", {day:"numeric", month:"long", year:"numeric"}) : "";
+    item.innerHTML = `<div class="etitle">${escapeHtml(e.title||"(sans titre)")}</div><div class="edate">${escapeHtml(dateStr)}${e.createdBy && currentNotebook==="shared" ? " · "+escapeHtml(e.createdBy.split("@")[0]) : ""}</div>`;
+    item.addEventListener("click", ()=> selectEntry(e.id));
+    list.appendChild(item);
+  });
+}
+
+function selectEntry(id){
+  flushSave();
+  currentEntryId = id;
+  const e = entries[id];
+  if(!e){ showEditor(false); return; }
+  fillEditor(e);
+  showEditor(true);
+  renderEntryList();
+}
+function showEditor(show){
+  document.getElementById("noEntry").style.display = show ? "none" : "flex";
+  document.getElementById("editorHead").style.display = show ? "flex" : "none";
+  document.getElementById("editorBody").style.display = show ? "flex" : "none";
+  document.getElementById("editorFooter").style.display = show ? "flex" : "none";
+}
+function fillEditor(e){
+  document.getElementById("entryTitle").value = e.title||"";
+  document.getElementById("entryDate").value = e.date||"";
+  document.getElementById("entryContent").value = e.content||"";
+  refreshPreview();
+}
+
+document.getElementById("btnNewEntry").addEventListener("click", async ()=>{
+  if(!currentUser){ toast("Connecte-toi d'abord."); return; }
+  flushSave();
+  try{
+    const today = new Date().toISOString().slice(0,10);
+    const num = Object.keys(entries).length + 1;
+    const ref = await notebookRef().add({
+      title: "Séance "+num, date: today, content: "",
+      createdBy: currentUser.email,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    currentEntryId = ref.id;
+    // onSnapshot will fill entries; select once it lands (fallback: fill now)
+    fillEditor({title:"Séance "+num, date:today, content:""});
+    showEditor(true);
+    setTimeout(()=>{ document.getElementById("entryTitle").focus(); document.getElementById("entryTitle").select(); }, 60);
+  }catch(e){ console.error(e); toast("Échec de la création — vérifie les règles Firestore 'journal'."); }
+});
+
+document.getElementById("btnDeleteEntry").addEventListener("click", async ()=>{
+  if(!currentEntryId) return;
+  const e = entries[currentEntryId];
+  if(!(await customConfirm(`Supprimer définitivement « ${e && e.title || "cette séance"} » ?`))) return;
+  try{
+    await notebookRef().doc(currentEntryId).delete();
+    currentEntryId = null;
+    showEditor(false);
+    toast("Séance supprimée.");
+  }catch(err){ console.error(err); toast("Échec de la suppression."); }
+});
+
+/* ---------------- autosave ---------------- */
+let saveTimer = null;
+let pendingSave = false;
+const titleEl = document.getElementById("entryTitle");
+const dateEl = document.getElementById("entryDate");
+const contentEl = document.getElementById("entryContent");
+
+[titleEl, dateEl, contentEl].forEach(el=>{
+  el.addEventListener("focus", ()=> editorFocused = true);
+  el.addEventListener("blur", ()=>{ editorFocused = false; flushSave(); });
+  el.addEventListener("input", ()=>{
+    pendingSave = true;
+    document.getElementById("saveStatus").textContent = "Modifications non enregistrées…";
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveEntry, 800);
+    if(el === contentEl) refreshPreview();
+  });
+});
+
+async function saveEntry(){
+  if(!currentEntryId || !pendingSave) return;
+  pendingSave = false;
+  try{
+    await notebookRef().doc(currentEntryId).set({
+      title: titleEl.value, date: dateEl.value, content: contentEl.value,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+    document.getElementById("saveStatus").textContent = "Enregistré ✓";
+  }catch(e){
+    console.error(e); pendingSave = true;
+    document.getElementById("saveStatus").textContent = "Échec de l'enregistrement.";
+    toast("Échec de la sauvegarde du carnet.");
+  }
+}
+function flushSave(){
+  clearTimeout(saveTimer);
+  if(pendingSave) saveEntry();
+}
+window.addEventListener("beforeunload", flushSave);
+
+/* ---------------- preview + wiki-links ---------------- */
+let previewMode = false;
+const previewBox = document.getElementById("entryPreview");
+document.getElementById("btnPreviewToggle").addEventListener("click", (e)=>{
+  previewMode = !previewMode;
+  e.target.textContent = previewMode ? "Modifier" : "Aperçu";
+  contentEl.style.display = previewMode ? "none" : "block";
+  previewBox.style.display = previewMode ? "block" : "none";
+  refreshPreview();
+});
+function refreshPreview(){
+  if(previewMode) previewBox.innerHTML = renderMarkdown(contentEl.value);
+}
+previewBox.addEventListener("click", (e)=>{
+  const link = e.target.closest("[data-entry-link]");
+  if(!link) return;
+  e.preventDefault();
+  const title = link.getAttribute("data-entry-link").toLowerCase();
+  const match = Object.values(entries).find(en=> (en.title||"").trim().toLowerCase() === title);
+  if(match) selectEntry(match.id);
+  else toast(`Aucune séance nommée « ${link.getAttribute("data-entry-link")} » dans ce carnet.`);
+});
+
+/* ---------------- image insertion (client-side compressed, embedded as data URL) ---------------- */
+const MAX_DOC_CHARS = 900000; // stay under Firestore's 1 MiB document limit
+document.getElementById("btnInsertImage").addEventListener("click", ()=>{
+  if(!currentEntryId){ toast("Ouvre d'abord une séance."); return; }
+  document.getElementById("imageFileInput").click();
+});
+document.getElementById("imageFileInput").addEventListener("change", (e)=>{
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = ()=>{
+    URL.revokeObjectURL(url);
+    const MAX_DIM = 1024;
+    let w = img.width, h = img.height;
+    if(w > MAX_DIM || h > MAX_DIM){
+      const k = MAX_DIM / Math.max(w, h);
+      w = Math.round(w*k); h = Math.round(h*k);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+    if(contentEl.value.length + dataUrl.length > MAX_DOC_CHARS){
+      toast("Image trop lourde pour cette séance — utilise une image plus petite ou un lien externe.");
+      return;
+    }
+    insertAtCursor(contentEl, `\n![image](${dataUrl})\n`);
+    pendingSave = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveEntry, 400);
+    refreshPreview();
+    toast("Image insérée.");
+  };
+  img.onerror = ()=>{ URL.revokeObjectURL(url); toast("Impossible de lire cette image."); };
+  img.src = url;
+});
+function insertAtCursor(textarea, text){
+  const start = textarea.selectionStart, end = textarea.selectionEnd;
+  const v = textarea.value;
+  textarea.value = v.slice(0, start) + text + v.slice(end);
+  textarea.selectionStart = textarea.selectionEnd = start + text.length;
+}
+</script>
+</body>
+</html>

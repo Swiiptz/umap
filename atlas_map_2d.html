@@ -9,10 +9,9 @@
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=Space+Mono&display=swap');
 
 *{box-sizing:border-box;}
-html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-family:'EB Garamond',serif; color:#e9dfc4;}
+html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-family:var(--font-body); color:#e9dfc4;}
 
 .topbar{
   position:fixed; top:0; left:0; right:0; z-index:20;
@@ -20,12 +19,12 @@ html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-famil
   padding:14px 20px; background:linear-gradient(180deg, rgba(5,12,10,0.9), rgba(5,12,10,0));
 }
 .topbar .left{ display:flex; align-items:center; gap:14px; }
-.topbar h1{font-family:'Cinzel',serif; font-size:20px; margin:0; letter-spacing:1px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8);}
+.topbar h1{font-family:var(--font-title); font-size:20px; margin:0; letter-spacing:1px; color:#ddc677; text-shadow:0 2px 8px rgba(0,0,0,0.8);}
 .topbar .tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.hint-text{ font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; }
+.hint-text{ font-size:11px; color:#8a9a91; font-family:var(--font-body); }
 
 .btn{
-  font-family:'EB Garamond',serif; font-size:14px; cursor:pointer;
+  font-family:var(--font-body); font-size:14px; cursor:pointer;
   background: linear-gradient(180deg,#ddc677,#c9a227); color:#0d1815; border:1px solid #c9a227; border-radius:6px;
   padding:8px 14px; font-weight:600;
   transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
@@ -41,16 +40,16 @@ html,body{margin:0; height:100%; overflow:hidden; background:#050c0a; font-famil
 
 select, .tag-filter{
   background:rgba(15,30,25,0.85); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
-  padding:8px 10px; font-family:'EB Garamond',serif; font-size:13px;
+  padding:8px 10px; font-family:var(--font-body); font-size:13px;
 }
 
 .user-badge{
   display:flex; align-items:center; gap:8px; font-size:12px; color:#b7ad8e;
-  font-family:'Space Mono',monospace; background:rgba(15,30,25,0.85); border:1px solid #3a544b;
+  font-family:var(--font-body); background:rgba(15,30,25,0.85); border:1px solid #3a544b;
   border-radius:6px; padding:7px 10px;
 }
 .user-badge button{
-  background:none; border:none; color:#ddc677; cursor:pointer; font-family:'EB Garamond',serif;
+  background:none; border:none; color:#ddc677; cursor:pointer; font-family:var(--font-body);
   font-size:12px; padding:0; text-decoration:underline;
 }
 
@@ -61,7 +60,7 @@ select, .tag-filter{
   background:linear-gradient(180deg, rgba(19,36,32,0.97), rgba(13,24,21,0.98));
   border:1px solid #c9a227; box-shadow:0 12px 30px rgba(0,0,0,0.5); flex-wrap:wrap; justify-content:center;
 }
-.hl-label{ font-size:11px; font-family:'Space Mono',monospace; color:#8a9a91; }
+.hl-label{ font-size:11px; font-family:var(--font-body); color:#8a9a91; }
 .hl-colors, .hl-sizes{ display:flex; gap:6px; align-items:center; }
 .hl-colors button{
   width:24px; height:24px; border-radius:50%; border:2px solid rgba(255,255,255,0.2); cursor:pointer;
@@ -82,7 +81,7 @@ select, .tag-filter{
 .zone-hub{ position:fixed; inset:0; z-index:5; display:none; align-items:center; justify-content:center; background:#0c1512; }
 .zone-hub.show{ display:flex; }
 .zone-hub-inner{ text-align:center; max-width:900px; padding:20px; }
-.zone-hub-inner h2{ font-family:'Cinzel',serif; color:#ddc677; font-size:24px; margin:0 0 6px; }
+.zone-hub-inner h2{ font-family:var(--font-heading-2); color:#ddc677; font-size:24px; margin:0 0 6px; }
 .zone-hub-inner .sub{ color:#b7ad8e; font-style:italic; margin-bottom:26px; }
 .zone-grid{ display:flex; flex-wrap:wrap; gap:16px; justify-content:center; }
 .zone-card{
@@ -92,7 +91,7 @@ select, .tag-filter{
 }
 .zone-card:hover{ transform:translateY(-3px); border-color:#c9a227; box-shadow:0 10px 30px rgba(201,162,39,0.2); }
 .zone-card .icon{ font-size:34px; margin-bottom:8px; }
-.zone-card h3{ font-family:'Cinzel',serif; font-size:16px; color:#ddc677; margin:0 0 4px; }
+.zone-card h3{ font-family:var(--font-heading-3); font-size:16px; color:#ddc677; margin:0 0 4px; }
 .zone-card p{ font-size:12.5px; color:#b7ad8e; font-style:italic; margin:0; }
 .zone-empty{ color:#8a9a91; font-style:italic; }
 
@@ -129,7 +128,7 @@ select, .tag-filter{
 }
 .pin-marker .dot span{ transform:rotate(45deg); font-size:14px; }
 .pin-marker .tag-label{
-  margin-top:2px; font-size:10px; font-family:'Space Mono',monospace; color:#f3ecd6;
+  margin-top:2px; font-size:10px; font-family:var(--font-body); color:#f3ecd6;
   background:rgba(5,12,10,0.75); padding:1px 6px; border-radius:8px; white-space:nowrap; max-width:140px; overflow:hidden; text-overflow:ellipsis;
 }
 
@@ -142,13 +141,13 @@ select, .tag-filter{
   display:flex; flex-direction:column; padding-top:120px;
 }
 .desc-panel.show{ transform:translateX(0); }
-.desc-panel h3{ font-family:'Cinzel',serif; font-size:15px; color:#ddc677; margin:0 18px 8px; letter-spacing:0.5px; }
+.desc-panel h3{ font-family:var(--font-heading-3); font-size:15px; color:#ddc677; margin:0 18px 8px; letter-spacing:0.5px; }
 .desc-panel textarea{
   flex:1; margin:0 18px 12px; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4;
-  border-radius:8px; padding:12px; font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; resize:none;
+  border-radius:8px; padding:12px; font-family:var(--font-body); font-size:14px; line-height:1.5; resize:none;
 }
 .desc-panel textarea:focus{ outline:none; border-color:#c9a227; }
-.desc-panel .meta{ margin:0 18px 16px; font-size:10.5px; color:#7a8f83; font-family:'Space Mono',monospace; }
+.desc-panel .meta{ margin:0 18px 16px; font-size:10.5px; color:#7a8f83; font-family:var(--font-body); }
 
 .panel-head-row{ display:flex; align-items:center; justify-content:space-between; margin:0 18px 8px; }
 .panel-head-row h3{ margin:0; }
@@ -156,10 +155,10 @@ select, .tag-filter{
 .md-content{
   flex:1; margin:0 18px 12px; padding:12px; overflow-y:auto;
   background:rgba(5,12,10,0.6); border:1px solid #3a544b; border-radius:8px;
-  font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; color:#e9dfc4;
+  font-family:var(--font-body); font-size:14px; line-height:1.5; color:#e9dfc4;
 }
 .md-content:empty::before{ content:"Rien à afficher pour l'instant."; color:#7a8f83; font-style:italic; }
-.md-content h1, .md-content h2, .md-content h3{ font-family:'Cinzel',serif; color:#ddc677; margin:0 0 8px; }
+.md-content h1, .md-content h2, .md-content h3{  color:#ddc677; margin:0 0 8px; }
 .md-content h1{ font-size:18px; } .md-content h2{ font-size:16px; } .md-content h3{ font-size:14px; }
 .md-content p{ margin:0 0 10px; }
 .md-content ul, .md-content ol{ margin:0 0 10px; padding-left:22px; }
@@ -167,7 +166,7 @@ select, .tag-filter{
 .md-content strong{ color:#f0e6c8; }
 .md-content em{ color:#cabf9e; }
 .md-content a{ color:#8fd6ff; }
-.md-content code{ background:rgba(0,0,0,0.35); padding:1px 5px; border-radius:4px; font-family:'Space Mono',monospace; font-size:12.5px; }
+.md-content code{ background:rgba(0,0,0,0.35); padding:1px 5px; border-radius:4px; font-family:var(--font-code); font-size:12.5px; }
 .md-content blockquote{ margin:0 0 10px; padding-left:10px; border-left:2px solid #3a544b; color:#b7ad8e; font-style:italic; }
 .md-content > *:last-child{ margin-bottom:0; }
 
@@ -183,17 +182,17 @@ select, .tag-filter{
 }
 .notes-drawer.show{ transform:translateX(0); }
 .notes-drawer .head{ display:flex; align-items:center; justify-content:space-between; margin:0 18px 8px; }
-.notes-drawer h3{ font-family:'Cinzel',serif; font-size:15px; color:#e8c07a; margin:0; letter-spacing:0.5px; }
+.notes-drawer h3{ font-family:var(--font-heading-3); font-size:15px; color:#e8c07a; margin:0; letter-spacing:0.5px; }
 .notes-drawer .close{ cursor:pointer; color:#b7ad8e; font-size:16px; }
 .notes-drawer .sub{ margin:0 18px 10px; font-size:11px; color:#a99a7a; font-style:italic; }
 .notes-drawer textarea{
   flex:1; margin:0 18px 12px; background:rgba(5,12,10,0.6); border:1px solid #5a4a2f; color:#e9dfc4;
-  border-radius:8px; padding:12px; font-family:'EB Garamond',serif; font-size:14px; line-height:1.5; resize:none;
+  border-radius:8px; padding:12px; font-family:var(--font-body); font-size:14px; line-height:1.5; resize:none;
 }
 .notes-drawer textarea:focus{ outline:none; border-color:#e8c07a; }
 .notes-drawer input{
   margin:0 18px 16px; background:rgba(5,12,10,0.6); border:1px solid #5a4a2f; color:#e9dfc4;
-  border-radius:8px; padding:9px 12px; font-family:'Space Mono',monospace; font-size:12px; width:calc(100% - 36px);
+  border-radius:8px; padding:9px 12px; font-family:var(--font-body); font-size:12px; width:calc(100% - 36px);
 }
 
 /* ---- pin modal ---- */
@@ -208,11 +207,11 @@ select, .tag-filter{
   border:1px solid #c9a227; border-radius:12px; padding:20px 22px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
   max-height:88vh; overflow-y:auto;
 }
-.pin-modal h3{ font-family:'Cinzel',serif; color:#ddc677; margin:0 0 14px; font-size:17px; }
-.pin-modal label{ display:block; font-size:11px; color:#8a9a91; font-family:'Space Mono',monospace; margin:10px 0 4px; text-transform:uppercase; letter-spacing:0.5px; }
+.pin-modal h3{ font-family:var(--font-heading-3); color:#ddc677; margin:0 0 14px; font-size:17px; }
+.pin-modal label{ display:block; font-size:11px; color:#8a9a91; font-family:var(--font-body); margin:10px 0 4px; text-transform:uppercase; letter-spacing:0.5px; }
 .pin-modal input[type=text], .pin-modal textarea{
   width:100%; background:rgba(5,12,10,0.6); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
-  padding:8px 10px; font-family:'EB Garamond',serif; font-size:14px;
+  padding:8px 10px; font-family:var(--font-body); font-size:14px;
 }
 .pin-modal textarea{ resize:vertical; min-height:60px; }
 .pin-modal input[type=text]:focus, .pin-modal textarea:focus{ outline:none; border-color:#c9a227; }
@@ -237,11 +236,11 @@ select, .tag-filter{
   background:linear-gradient(180deg, rgba(19,36,32,0.97), rgba(13,24,21,0.98));
   border:1px solid #c9a227; border-radius:10px; padding:12px 14px; box-shadow:0 12px 30px rgba(0,0,0,0.55);
 }
-.pin-popup h4{ margin:0 0 4px; font-family:'Cinzel',serif; font-size:14.5px; color:#ddc677; display:flex; align-items:center; gap:6px; }
+.pin-popup h4{ margin:0 0 4px; font-family:var(--font-heading-3); font-size:14.5px; color:#ddc677; display:flex; align-items:center; gap:6px; }
 .pin-popup .tags{ margin:4px 0; display:flex; flex-wrap:wrap; gap:4px; }
-.pin-popup .tags span{ font-size:10px; font-family:'Space Mono',monospace; background:rgba(201,162,39,0.15); border:1px solid rgba(201,162,39,0.35); border-radius:10px; padding:1px 7px; color:#e8d488; }
+.pin-popup .tags span{ font-size:10px; font-family:var(--font-body); background:rgba(201,162,39,0.15); border:1px solid rgba(201,162,39,0.35); border-radius:10px; padding:1px 7px; color:#e8d488; }
 .pin-popup .notes{ font-size:12.5px; color:#cabf9e; line-height:1.4; margin:6px 0; white-space:pre-wrap; }
-.pin-popup .meta{ font-size:10px; color:#7a8f83; font-family:'Space Mono',monospace; margin-bottom:8px; }
+.pin-popup .meta{ font-size:10px; color:#7a8f83; font-family:var(--font-body); margin-bottom:8px; }
 .pin-popup .row{ display:flex; gap:6px; }
 .pin-popup .close{ position:absolute; top:6px; right:9px; cursor:pointer; color:#b7ad8e; font-size:14px; }
 
@@ -258,7 +257,7 @@ select, .tag-filter{
   animation: loading-pulse 1.6s ease-in-out infinite;
   text-shadow:0 0 20px rgba(221,198,119,0.5);
 }
-.loading-text{ margin-top:14px; font-family:'Space Mono',monospace; font-size:12px; color:#8a9a91; letter-spacing:1px; }
+.loading-text{ margin-top:14px; font-family:var(--font-body); font-size:12px; color:#8a9a91; letter-spacing:1px; }
 @keyframes loading-pulse{
   0%,100%{ transform:scale(1) rotate(0deg); opacity:0.6; }
   50%{ transform:scale(1.18) rotate(180deg); opacity:1; }
@@ -277,11 +276,11 @@ select, .tag-filter{
   border:1px solid #c9a227; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
   text-align:center;
 }
-.auth-card h1{ font-family:'Cinzel',serif; font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
+.auth-card h1{ font-family:var(--font-title); font-size:22px; color:#ddc677; margin:0 0 6px; letter-spacing:1px; }
 .auth-card .auth-sub{ font-size:13px; color:#b7ad8e; font-style:italic; margin-bottom:20px; }
 .auth-card input{
   width:100%; background:rgba(5,12,10,0.7); border:1px solid #3a544b; color:#e9dfc4; border-radius:6px;
-  padding:10px 12px; font-family:'EB Garamond',serif; font-size:14px; margin-bottom:10px;
+  padding:10px 12px; font-family:var(--font-body); font-size:14px; margin-bottom:10px;
 }
 .auth-card input:focus{ outline:none; border-color:#c9a227; box-shadow:0 0 0 2px rgba(201,162,39,0.25); }
 .auth-card .btn{ width:100%; margin-top:4px; }
@@ -294,6 +293,7 @@ select, .tag-filter{
 }
 .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 </style>
+<link rel="stylesheet" href="assets/typography.css">
 </head>
 <body>
 
@@ -1147,7 +1147,7 @@ mapWrap.addEventListener("click", (e)=>{
 function landmark(x, y, iconSvg, label, size){
   size = size||13;
   return `<g transform="translate(${x},${y})">${iconSvg}
-    <text x="0" y="${size+16}" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="${size}" fill="#2a2010" stroke="#e8dcb8" stroke-width="3" paint-order="stroke">${label}</text>
+    <text x="0" y="${size+16}" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="${size}" fill="#2a2010" stroke="#e8dcb8" stroke-width="3" paint-order="stroke">${label}</text>
   </g>`;
 }
 const ICON_TOWER = `<polygon points="-9,10 -9,-6 -5,-14 5,-14 9,-6 9,10" fill="#6b6558" stroke="#332f28" stroke-width="1.3"/><rect x="-2" y="-20" width="4" height="8" fill="#332f28"/>`;
@@ -1217,7 +1217,7 @@ const MAP_BUILDERS = {
 
     <!-- Water of Leith, winding from Dean Village through Stockbridge toward the Forth -->
     <path d="M90,255 Q140,230 175,205 Q230,175 260,140 Q300,105 360,90" fill="none" stroke="#4a86bd" stroke-width="4" opacity="0.55" stroke-linecap="round"/>
-    <text x="300" y="115" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#2c5580" transform="rotate(-32 300 115)">Water of Leith</text>
+    <text x="300" y="115" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#2c5580" transform="rotate(-32 300 115)">Water of Leith</text>
 
     <!-- Leith (port district) -->
     <g>
@@ -1225,23 +1225,23 @@ const MAP_BUILDERS = {
       <rect x="478" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
       <rect x="500" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
       <rect x="522" y="68" width="16" height="14" fill="#8a7346" stroke="#5c4a2a" stroke-width="1"/>
-      <text x="515" y="118" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#2a3a18" letter-spacing="1">LEITH</text>
+      <text x="515" y="118" text-anchor="middle" font-family="var(--font-heading-2)" font-size="14" fill="#2a3a18" letter-spacing="1">LEITH</text>
     </g>
     <!-- Leith Walk connecting the port down to New Town -->
     <path d="M560,120 Q650,170 705,222" fill="none" stroke="#8a7346" stroke-width="2.5" opacity="0.55" stroke-dasharray="2,5"/>
-    <text x="650" y="168" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(38 650 168)">Leith Walk</text>
+    <text x="650" y="168" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(38 650 168)">Leith Walk</text>
 
     <!-- Stockbridge -->
     <g>
       <ellipse cx="230" cy="185" rx="52" ry="30" fill="#c7b96a" stroke="#6b5a35" stroke-width="1.5" opacity="0.9"/>
-      <text x="230" y="190" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="13" fill="#3a2c18">Stockbridge</text>
+      <text x="230" y="190" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="13" fill="#3a2c18">Stockbridge</text>
     </g>
 
     <!-- Dean Village (west) -->
     <g>
       <ellipse cx="130" cy="255" rx="52" ry="32" fill="#b3a173" stroke="#6b5a35" stroke-width="1.5"/>
       ${[[112,246],[148,250],[130,268]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="7" fill="#5c7a45"/>`).join("")}
-      <text x="130" y="260" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12.5" fill="#3a2c18">Dean Village</text>
+      <text x="130" y="260" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="12.5" fill="#3a2c18">Dean Village</text>
     </g>
 
     <!-- Calton Hill (between New Town and Holyrood) -->
@@ -1257,11 +1257,11 @@ const MAP_BUILDERS = {
       ${[0,1,2,3,4,5].map(i=>`<rect x="${270+i*68}" y="252" width="56" height="36" rx="3" fill="#cabf94" stroke="#8a7a52" stroke-width="1"/>`).join("")}
       <line x1="262" y1="208" x2="678" y2="208" stroke="#7a6a45" stroke-width="1.5" opacity="0.7"/>
       <line x1="262" y1="250" x2="678" y2="250" stroke="#7a6a45" stroke-width="1.5" opacity="0.7"/>
-      <text x="258" y="205" text-anchor="end" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">Queen St.</text>
-      <text x="258" y="247" text-anchor="end" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">George St.</text>
-      <text x="330" y="292" text-anchor="start" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">Princes St.</text>
-      <text x="500" y="155" text-anchor="middle" font-family="Cinzel, serif" font-size="16" fill="#4a3c22" letter-spacing="1">NEW TOWN</text>
-      <text x="690" y="205" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#4a3c22">York Pl.</text>
+      <text x="258" y="205" text-anchor="end" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#4a3c22">Queen St.</text>
+      <text x="258" y="247" text-anchor="end" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#4a3c22">George St.</text>
+      <text x="330" y="292" text-anchor="start" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#4a3c22">Princes St.</text>
+      <text x="500" y="155" text-anchor="middle" font-family="var(--font-heading-2)" font-size="16" fill="#4a3c22" letter-spacing="1">NEW TOWN</text>
+      <text x="690" y="205" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#4a3c22">York Pl.</text>
     </g>
 
     <!-- Princes Street Gardens (valley between New Town and the Castle) -->
@@ -1280,17 +1280,17 @@ const MAP_BUILDERS = {
       <polygon points="200,330 215,280 235,310 255,275 270,330" fill="#6b6558" stroke="#332f28" stroke-width="2"/>
       <rect x="238" y="285" width="10" height="26" fill="#332f28"/>
       <rect x="205" y="305" width="8" height="20" fill="#332f28"/>
-      <text x="230" y="422" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2418" letter-spacing="1">EDINBURGH CASTLE</text>
+      <text x="230" y="422" text-anchor="middle" font-family="var(--font-heading-2)" font-size="15" fill="#2a2418" letter-spacing="1">EDINBURGH CASTLE</text>
     </g>
 
     <!-- Grassmarket, Cowgate, Greyfriars -->
     <g>
       <ellipse cx="255" cy="450" rx="60" ry="26" fill="#c2b689" stroke="#6b5a35" stroke-width="1.5"/>
-      <text x="255" y="455" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="13" fill="#3a2c18">Grassmarket</text>
+      <text x="255" y="455" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="13" fill="#3a2c18">Grassmarket</text>
     </g>
     <g>
       <ellipse cx="335" cy="475" rx="48" ry="20" fill="#c2b689" stroke="#6b5a35" stroke-width="1.5" opacity="0.9"/>
-      <text x="335" y="479" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11.5" fill="#3a2c18">Cowgate</text>
+      <text x="335" y="479" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="11.5" fill="#3a2c18">Cowgate</text>
     </g>
     ${landmark(255,490,ICON_KIRKYARD,"Greyfriars Kirkyard",9.5)}
 
@@ -1304,9 +1304,9 @@ const MAP_BUILDERS = {
         return `<rect x="${x-13}" y="${y-h}" width="26" height="${h}" transform="rotate(-6 ${x} ${y})" fill="${i%2? '#a9895a':'#9c7f4d'}" stroke="#5c4a2a" stroke-width="1"/>`;
       }).join("")}
       ${landmark(400,338,ICON_SPIRE,"St Giles' Cathedral",10)}
-      <text x="460" y="418" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2010" letter-spacing="1">OLD TOWN — ROYAL MILE</text>
-      <text x="300" y="345" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10" fill="#3a2c18">Lawnmarket</text>
-      <text x="560" y="330" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10" fill="#3a2c18">Canongate</text>
+      <text x="460" y="418" text-anchor="middle" font-family="var(--font-heading-2)" font-size="15" fill="#2a2010" letter-spacing="1">OLD TOWN — ROYAL MILE</text>
+      <text x="300" y="345" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10" fill="#3a2c18">Lawnmarket</text>
+      <text x="560" y="330" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10" fill="#3a2c18">Canongate</text>
     </g>
 
     <!-- National Museum of Scotland (Chambers St, at the Old Town / Southside border) -->
@@ -1317,7 +1317,7 @@ const MAP_BUILDERS = {
       <rect x="665" y="355" width="72" height="42" rx="4" fill="#c2b0e0" stroke="#4a3a6b" stroke-width="1.5"/>
       <rect x="673" y="363" width="14" height="14" fill="#a898c8" stroke="#4a3a6b" stroke-width="1"/>
       <rect x="705" y="363" width="14" height="14" fill="#a898c8" stroke="#4a3a6b" stroke-width="1"/>
-      <text x="701" y="414" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12.5" fill="#2a2010">Holyrood Palace</text>
+      <text x="701" y="414" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="12.5" fill="#2a2010">Holyrood Palace</text>
     </g>
     ${landmark(770,400,ICON_PARLIAMENT,"Scottish Parliament",9.5)}
 
@@ -1328,52 +1328,52 @@ const MAP_BUILDERS = {
       <ellipse cx="850" cy="340" rx="48" ry="30" fill="none" stroke="#3f4a2c" stroke-width="1" opacity="0.4"/>
       <polygon points="810,320 850,250 900,310 870,350" fill="#7a8a5a" stroke="#3f4a2c" stroke-width="1.5"/>
       ${[[785,375],[910,385],[845,405]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="6" fill="#4f5c38"/>`).join("")}
-      <text x="850" y="428" text-anchor="middle" font-family="Cinzel, serif" font-size="15" fill="#2a2418" letter-spacing="1">ARTHUR'S SEAT</text>
-      <text x="850" y="443" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#2a2418">Holyrood Park</text>
+      <text x="850" y="428" text-anchor="middle" font-family="var(--font-heading-2)" font-size="15" fill="#2a2418" letter-spacing="1">ARTHUR'S SEAT</text>
+      <text x="850" y="443" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#2a2418">Holyrood Park</text>
     </g>
 
     <!-- The Meadows (south park), with trees -->
     <g>
       <ellipse cx="400" cy="555" rx="130" ry="50" fill="#8fae6f" stroke="#4a5c33" stroke-width="1.5" opacity="0.9"/>
       ${[[330,535],[360,570],[390,530],[425,565],[460,535],[440,578]].map(([x,y])=>`<circle cx="${x}" cy="${y}" r="8" fill="#5c7a3f" stroke="#3a4c28" stroke-width="1"/>`).join("")}
-      <text x="400" y="560" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#2a3318" letter-spacing="1">THE MEADOWS</text>
+      <text x="400" y="560" text-anchor="middle" font-family="var(--font-heading-2)" font-size="14" fill="#2a3318" letter-spacing="1">THE MEADOWS</text>
     </g>
-    <text x="400" y="614" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#3a2c18">Melville Drive</text>
+    <text x="400" y="614" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#3a2c18">Melville Drive</text>
     <ellipse cx="230" cy="610" rx="70" ry="24" fill="#8fae6f" stroke="#4a5c33" stroke-width="1.3" opacity="0.75"/>
-    <text x="230" y="614" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="11" fill="#2a3318">Bruntsfield Links</text>
+    <text x="230" y="614" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="11" fill="#2a3318">Bruntsfield Links</text>
 
     <!-- Marchmont / Bruntsfield / Tollcross / Fountainbridge (south-west) -->
     <g opacity="0.9">
       ${[0,1,2].map(i=>`<rect x="${150+i*55}" y="590" width="45" height="55" rx="3" fill="#d0b98a" stroke="#6b5a35" stroke-width="1"/>`).join("")}
-      <text x="215" y="660" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12" fill="#3a2c18">Marchmont</text>
+      <text x="215" y="660" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="12" fill="#3a2c18">Marchmont</text>
     </g>
     <g opacity="0.9">
       ${[0,1].map(i=>`<rect x="${40+i*50}" y="500" width="42" height="55" rx="3" fill="#d0a878" stroke="#6b5a35" stroke-width="1"/>`).join("")}
-      <text x="90" y="480" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="12" fill="#3a2c18">Tollcross</text>
+      <text x="90" y="480" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="12" fill="#3a2c18">Tollcross</text>
     </g>
-    <text x="140" y="530" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Fountainbridge</text>
+    <text x="140" y="530" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18">Fountainbridge</text>
 
     <!-- West End / Haymarket / Dalry (west) -->
     <g opacity="0.9">
       ${[0,1,2].map(i=>`<rect x="${40+i*48}" y="380" width="40" height="55" rx="3" fill="#c9a878" stroke="#6b5a35" stroke-width="1"/>`).join("")}
-      <text x="100" y="365" text-anchor="middle" font-family="Cinzel, serif" font-size="13" fill="#3a2c18" letter-spacing="0.5">WEST END</text>
-      <text x="60" y="460" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Haymarket</text>
-      <text x="140" y="460" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Dalry</text>
+      <text x="100" y="365" text-anchor="middle" font-family="var(--font-heading-2)" font-size="13" fill="#3a2c18" letter-spacing="0.5">WEST END</text>
+      <text x="60" y="460" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18">Haymarket</text>
+      <text x="140" y="460" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18">Dalry</text>
     </g>
-    <text x="120" y="395" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(-8 120 395)">Lothian Road</text>
+    <text x="120" y="395" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18" transform="rotate(-8 120 395)">Lothian Road</text>
 
     <!-- Southside / Newington -->
     <g opacity="0.9">
       ${[0,1,2].map(i=>`<rect x="${610+i*58}" y="480" width="48" height="70" rx="3" fill="#c2b689" stroke="#6b5a35" stroke-width="1"/>`).join("")}
-      <text x="700" y="580" text-anchor="middle" font-family="Cinzel, serif" font-size="14" fill="#3a2c18" letter-spacing="1">SOUTHSIDE</text>
-      <text x="620" y="465" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Nicolson St.</text>
-      <text x="700" y="465" text-anchor="middle" font-family="EB Garamond, serif" font-style="italic" font-size="10.5" fill="#3a2c18">Clerk St.</text>
+      <text x="700" y="580" text-anchor="middle" font-family="var(--font-heading-2)" font-size="14" fill="#3a2c18" letter-spacing="1">SOUTHSIDE</text>
+      <text x="620" y="465" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18">Nicolson St.</text>
+      <text x="700" y="465" text-anchor="middle" font-family="var(--font-body)" font-style="italic" font-size="10.5" fill="#3a2c18">Clerk St.</text>
     </g>
 
     <!-- title cartouche -->
     <g transform="translate(500,42)">
       <path d="M-160,-2 Q0,-26 160,-2 Q0,20 -160,-2 Z" fill="#e8dcb8" stroke="#4a3c22" stroke-width="1.5" opacity="0.9"/>
-      <text x="0" y="4" text-anchor="middle" font-family="Cinzel, serif" font-size="24" fill="#3a2c18" letter-spacing="3">ÉDIMBOURG</text>
+      <text x="0" y="4" text-anchor="middle" font-family="var(--font-heading-2)" font-size="24" fill="#3a2c18" letter-spacing="3">ÉDIMBOURG</text>
     </g>
 
     <!-- decorative compass rose -->
@@ -1381,7 +1381,7 @@ const MAP_BUILDERS = {
       <circle r="38" fill="none" stroke="#4a3c22" stroke-width="1.5"/>
       <path d="M0,-34 L7,0 L0,34 L-7,0 Z" fill="#4a3c22"/>
       <path d="M-34,0 L0,-7 L34,0 L0,7 Z" fill="#8a7a52"/>
-      <text x="0" y="-44" text-anchor="middle" font-family="Cinzel, serif" font-size="12" fill="#3a2c18">N</text>
+      <text x="0" y="-44" text-anchor="middle" font-family="var(--font-heading-2)" font-size="12" fill="#3a2c18">N</text>
     </g>
 
     <!-- decorative border with corner flourishes -->
